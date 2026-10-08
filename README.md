@@ -66,12 +66,10 @@ Abre una terminal en la carpeta raíz del proyecto (cooperativa-api).
 
 **Compila y limpia el proyecto con Maven:**
 
-Bash
-mvn clean compile
+"mvn clean compile"
 Ejecuta la aplicación Spring Boot:
 
-Bash
-mvn spring-boot:run
+"mvn spring-boot:run"
 El servidor web iniciará por defecto en el puerto 8081:
 http://localhost:8081
 
