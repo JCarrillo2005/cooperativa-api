@@ -1,0 +1,17 @@
+# Copia este archivo como config.properties (en la raiz del proyecto)
+# y pon tus datos. config.properties NO se sube a Git.
+
+db.url=jdbc:oracle:thin:@localhost:1521:XE
+db.user=TU_USUARIO
+db.password=TU_CONTRASENA
+
+# Base secundaria exclusiva para migracion/respaldo (no usar una BD con datos ajenos).
+pg.url=jdbc:postgresql://localhost:5432/cooperativa_respaldo
+pg.user=cooperativa
+pg.password=TU_CONTRASENA_POSTGRES
+
+# Recuperacion: esquema Oracle propio, vacio y distinto del origen.
+# Completar solo al recuperar; nunca usar SYSTEM/SYS ni el esquema en uso.
+restore.oracle.url=jdbc:oracle:thin:@localhost:1521:XE
+restore.oracle.user=COOPERATIVA_RECUPERADA
+restore.oracle.password=TU_CONTRASENA_RECUPERACION
