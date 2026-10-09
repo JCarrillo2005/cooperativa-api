@@ -1,0 +1,21 @@
+Fuentes de Tierra Fértil
+
+Estas fuentes se incluyen localmente para que la interfaz funcione sin solicitar
+recursos a Google Fonts ni a otros servicios externos.
+
+Hanken Grotesk · The Hanken Grotesk Project Authors
+Fuente oficial: https://github.com/google/fonts/tree/main/ofl/hankengrotesk
+Licencia: Hanken-Grotesk-OFL.txt (SIL Open Font License 1.1)
+Archivos: hanken-grotesk-latin.woff2, hanken-grotesk-latin-ext.woff2
+Pesos usados en la interfaz: 300–600, estilo normal.
+
+Newsreader · The Newsreader Project Authors / Production Type
+Fuente oficial: https://github.com/google/fonts/tree/main/ofl/newsreader
+Licencia: Newsreader-OFL.txt (SIL Open Font License 1.1)
+Archivos: newsreader-latin.woff2, newsreader-latin-ext.woff2,
+          newsreader-italic-latin.woff2, newsreader-italic-latin-ext.woff2
+Pesos usados en la interfaz: 300–400, estilos normal e itálico.
+
+Distribución WOFF2 oficial: https://fonts.googleapis.com/css2 y fonts.gstatic.com.
+Los subconjuntos Latin y Latin extended conservan las letras acentuadas,
+la eñe y los signos de puntuación del español. Archivos sin modificaciones.

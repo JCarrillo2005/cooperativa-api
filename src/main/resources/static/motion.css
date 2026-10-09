@@ -1,0 +1,322 @@
+/* Capa de movimiento. Cargar después de styles.css.
+ * No modifica medidas, composición, tipografía ni paleta de la interfaz.
+ * GSAP utiliza transform; las interacciones usan translate/scale independientes
+ * para que un hover no interrumpa un revelado ni sus transiciones lo retrasen.
+ */
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* Las animaciones CSS anteriores quedan como alternativa si GSAP no carga.
+ * El controlador de movimiento añade motion-ready únicamente al inicializarse.
+ * No transformar .application: contiene la navegación con position:fixed.
+ */
+html.motion-ready .intro-content,
+html.motion-ready .application,
+html.motion-ready .intro.saliendo,
+html.motion-ready .intro.leaving,
+html.motion-ready dialog[open] {
+  animation: none;
+}
+
+html.motion-ready .hero-title-line,
+html.motion-ready .hero-title em {
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* Las curvas existentes pasan a una capa decorativa para recibir movimiento.
+ * Conservan exactamente sus trazos, sombras y posiciones originales.
+ * La preferencia de movimiento reducido no oculta esta decoración estática.
+ */
+.hero-landscape {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.hero-landscape-art {
+  position: absolute;
+  inset: 0;
+}
+
+html.motion-ready .hero::before,
+html.motion-ready .hero::after {
+  display: none;
+}
+
+.hero-landscape-art::before,
+.hero-landscape-art::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  border: 1px solid #b5c4a620;
+  border-radius: 50%;
+  width: 1050px;
+  height: 490px;
+  right: -350px;
+  bottom: -370px;
+  transform: rotate(-28deg);
+}
+
+.hero-landscape-art::after {
+  width: 1180px;
+  height: 540px;
+  right: -390px;
+  bottom: -385px;
+  box-shadow: 0 0 0 30px #b5c4a606, 0 0 0 60px #b5c4a603;
+}
+
+/* Un solo indicador se desplaza dentro del dock. Los valores los mide JS.
+ * data-motion-ready se establece después de la primera medición correcta;
+ * mientras tanto, se conserva el fondo activo original como alternativa.
+ * Anchura y altura se actualizan sin animación al cambiar el tamaño del dock.
+ */
+.dock-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: var(--dock-w, 0px);
+  height: var(--dock-h, 0px);
+  transform: translate(var(--dock-x, 0px), var(--dock-y, 0px));
+  border-radius: 14px;
+  background: var(--forest);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .6s cubic-bezier(.2, .8, .2, 1);
+  will-change: transform;
+}
+
+.dock[data-motion-ready="true"] .dock-indicator {
+  opacity: 1;
+}
+
+.dock .dock-item {
+  position: relative;
+  z-index: 1;
+}
+
+.dock[data-motion-ready="true"] .dock-item.active,
+.dock[data-motion-ready="true"] .dock-item[aria-current="page"] {
+  background: transparent;
+}
+
+/* Se sustituyen únicamente los transform de interacción de styles.css.
+ * La rotación existente de la flecha de entrada se conserva en su propio span.
+ */
+.btn,
+.intro-enter,
+.icon-button {
+  transition: scale .4s cubic-bezier(.2, .8, .2, 1),
+              box-shadow .4s cubic-bezier(.2, .8, .2, 1),
+              background .25s cubic-bezier(.2, .8, .2, 1),
+              color .25s cubic-bezier(.2, .8, .2, 1);
+}
+
+.btn:not(:disabled):hover,
+.btn:not(:disabled):active,
+.intro-enter:hover,
+.intro-enter:active,
+.icon-button:hover,
+.module-card:hover {
+  transform: none;
+}
+
+.btn svg,
+.icon-button svg,
+.dock-item svg,
+.intro-enter > span,
+.module-card .module-arrow {
+  transition: scale .4s cubic-bezier(.2, .8, .2, 1),
+              transform .4s cubic-bezier(.2, .8, .2, 1);
+  transform-origin: center;
+}
+
+.module-card {
+  transition: translate .55s cubic-bezier(.2, .8, .2, 1),
+              scale .4s cubic-bezier(.2, .8, .2, 1),
+              box-shadow .55s cubic-bezier(.2, .8, .2, 1),
+              background .3s cubic-bezier(.2, .8, .2, 1),
+              border-color .3s cubic-bezier(.2, .8, .2, 1);
+}
+
+.data-table tbody tr {
+  position: relative;
+  transition: translate .4s cubic-bezier(.2, .8, .2, 1),
+              scale .4s cubic-bezier(.2, .8, .2, 1),
+              box-shadow .4s cubic-bezier(.2, .8, .2, 1),
+              background .4s cubic-bezier(.2, .8, .2, 1);
+  transform-origin: center;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:not(:disabled):hover,
+  .intro-enter:not(:disabled):hover,
+  .icon-button:not(:disabled):hover {
+    scale: 1.03;
+  }
+
+  .btn:not(:disabled):hover svg,
+  .icon-button:not(:disabled):hover svg,
+  .dock-item:not(:disabled):hover svg,
+  .intro-enter:not(:disabled):hover > span,
+  .module-card:not(:disabled):hover .module-arrow {
+    scale: 1.12;
+  }
+
+  .module-card:not(:disabled):hover {
+    translate: 0 -6px;
+    box-shadow: 0 30px 60px -30px rgba(19, 31, 26, .3);
+  }
+
+  .data-table tbody tr:hover {
+    z-index: 1;
+    background: #fff;
+    translate: 0 -2px;
+    box-shadow: 0 14px 34px -16px rgba(19, 31, 26, .22);
+  }
+}
+
+/* El teclado recibe la misma respuesta visual que el puntero. */
+.btn:not(:disabled):focus-visible,
+.intro-enter:not(:disabled):focus-visible,
+.icon-button:not(:disabled):focus-visible {
+  scale: 1.03;
+}
+
+.dock-item:not(:disabled):focus-visible svg {
+  scale: 1.12;
+}
+
+.module-card:not(:disabled):focus-visible {
+  translate: 0 -6px;
+  box-shadow: 0 30px 60px -30px rgba(19, 31, 26, .3);
+}
+
+.data-table tbody tr:has(button:focus-visible),
+.data-table tbody tr[aria-selected="true"],
+.data-table tbody tr.is-selected {
+  z-index: 2;
+  translate: 0 -3px;
+  scale: 1.004;
+  box-shadow: 0 14px 34px -16px rgba(19, 31, 26, .22);
+}
+
+.btn:not(:disabled):active,
+.intro-enter:not(:disabled):active,
+.icon-button:not(:disabled):active,
+.module-card:not(:disabled):active {
+  scale: .98;
+}
+
+@media (max-width: 759px) {
+  .dock-indicator {
+    border-radius: 13px;
+  }
+}
+
+/* Si la preferencia cambia durante una animación, los contenidos siguen
+ * legibles. El controlador debe revertir GSAP y destruir Lenis al detectarlo.
+ * No se toca el transform de .dock: posiciona la barra móvil, no la anima.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html,
+  html.lenis,
+  html.lenis body {
+    scroll-behavior: auto !important;
+  }
+
+  .dock-indicator,
+  .btn,
+  .intro-enter,
+  .icon-button,
+  .module-card,
+  .data-table tbody tr,
+  .btn svg,
+  .icon-button svg,
+  .dock-item svg,
+  .intro-enter > span,
+  .module-card .module-arrow {
+    transition: none !important;
+  }
+
+  .btn,
+  .intro-enter,
+  .icon-button,
+  .module-card,
+  .data-table tbody tr,
+  .btn svg,
+  .icon-button svg,
+  .dock-item svg,
+  .intro-enter > span,
+  .module-card .module-arrow {
+    translate: none !important;
+    scale: none !important;
+  }
+
+  [data-reveal],
+  [data-stagger] > *,
+  [data-clip] {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    filter: none !important;
+    clip-path: none !important;
+  }
+}
+
+/* La impresión nunca captura un bloque a medio revelar. Se mantienen las
+ * reglas originales que ocultan navegación, introducción y avisos al imprimir.
+ */
+@media print {
+  html.lenis,
+  html.lenis body,
+  .lenis.lenis-stopped {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .application,
+  [data-reveal],
+  [data-stagger] > *,
+  [data-clip],
+  [data-parallax],
+  [data-speed],
+  .hero-copy,
+  .hero-copy > *,
+  .metric,
+  .module-card,
+  .document,
+  .data-table tbody tr {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    translate: none !important;
+    scale: none !important;
+    filter: none !important;
+    clip-path: none !important;
+  }
+
+  .dock-indicator {
+    display: none !important;
+  }
+}

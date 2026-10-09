@@ -70,9 +70,14 @@ public class PrestamoDAO {
     // ---------- READ ----------
 
     public Prestamo obtenerPorId(int id) throws SQLException {
+        try (Connection conn = ConexionOracle.getConexion()) {
+            return obtenerPorId(id, conn);
+        }
+    }
+
+    public Prestamo obtenerPorId(int id, Connection conn) throws SQLException {
         String sql = "SELECT " + COLUMNAS + " FROM prestamos WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -81,6 +86,18 @@ public class PrestamoDAO {
             }
         }
         return null;
+    }
+
+    /** El saldo se relee despues de adquirir el bloqueo para no perder abonos concurrentes. */
+    public void bloquear(int id, Connection conn) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM prestamos WHERE id = ? FOR UPDATE")) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new SQLException("El prestamo no existe.");
+                }
+            }
+        }
     }
 
     public Prestamo obtenerPorIdConDetalles(int id) throws SQLException {
@@ -123,25 +140,11 @@ public class PrestamoDAO {
     // ---------- UPDATE ----------
 
     public boolean actualizar(Prestamo p) throws SQLException {
-        String sql = "UPDATE prestamos SET monto = ?, tasa_interes = ?, "
-                   + "fecha_vencimiento = ?, estatus_id = ? WHERE id = ?";
         try (Connection conn = ConexionOracle.getConexion()) {
             boolean autoCommitOriginal = conn.getAutoCommit();
             try {
                 conn.setAutoCommit(false);
-                boolean actualizado;
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setBigDecimal(1, p.getMonto());
-                    ps.setBigDecimal(2, p.getTasaInteres());
-                    if (p.getFechaVencimiento() == null) {
-                        ps.setNull(3, Types.DATE);
-                    } else {
-                        ps.setDate(3, new java.sql.Date(p.getFechaVencimiento().getTime()));
-                    }
-                    ps.setInt(4, p.getEstatusId());
-                    ps.setInt(5, p.getId());
-                    actualizado = ps.executeUpdate() == 1;
-                }
+                boolean actualizado = actualizar(p, conn);
                 conn.commit();
                 return actualizado;
             } catch (SQLException e) {
@@ -150,6 +153,24 @@ public class PrestamoDAO {
             } finally {
                 conn.setAutoCommit(autoCommitOriginal);
             }
+        }
+    }
+
+    /** Actualiza dentro de la transaccion del abono, sin confirmar por separado. */
+    public boolean actualizar(Prestamo p, Connection conn) throws SQLException {
+        String sql = "UPDATE prestamos SET monto = ?, tasa_interes = ?, "
+                   + "fecha_vencimiento = ?, estatus_id = ? WHERE id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setBigDecimal(1, p.getMonto());
+            ps.setBigDecimal(2, p.getTasaInteres());
+            if (p.getFechaVencimiento() == null) {
+                ps.setNull(3, Types.DATE);
+            } else {
+                ps.setDate(3, new java.sql.Date(p.getFechaVencimiento().getTime()));
+            }
+            ps.setInt(4, p.getEstatusId());
+            ps.setInt(5, p.getId());
+            return ps.executeUpdate() == 1;
         }
     }
 

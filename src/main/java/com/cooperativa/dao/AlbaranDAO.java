@@ -11,7 +11,7 @@ import java.util.List;
 
 public class AlbaranDAO {
 
-    private static final String COLUMNAS = "id, numero_talonario, persona_id, sede_id, fecha";
+    private static final String COLUMNAS = "id, numero_talonario, persona_id, sede_id, fecha, liquidado";
 
     // ---------- CREATE ----------
 
@@ -27,7 +27,8 @@ public class AlbaranDAO {
      */
     public boolean guardar(Albaran a, Connection conn) throws SQLException {
         a.setId(siguienteId(conn));
-        String sql = "INSERT INTO albaranes (" + COLUMNAS + ") VALUES (?, ?, ?, ?, SYSDATE)";
+        a.setLiquidado(false);
+        String sql = "INSERT INTO albaranes (" + COLUMNAS + ") VALUES (?, ?, ?, ?, SYSDATE, 0)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, a.getId());
             ps.setString(2, a.getNumeroTalonario());
@@ -49,9 +50,15 @@ public class AlbaranDAO {
 
     /** Solo el encabezado (sin la lista de detalles). */
     public Albaran obtenerPorId(int id) throws SQLException {
+        try (Connection conn = ConexionOracle.getConexion()) {
+            return obtenerPorId(id, conn);
+        }
+    }
+
+    /** Lectura en la transaccion del llamador, sin abrir otra conexion. */
+    public Albaran obtenerPorId(int id, Connection conn) throws SQLException {
         String sql = "SELECT " + COLUMNAS + " FROM albaranes WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -60,6 +67,27 @@ public class AlbaranDAO {
             }
         }
         return null;
+    }
+
+    /** Bloquea primero; el encabezado debe releerse despues de cualquier espera. */
+    public void bloquear(int id, Connection conn) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM albaranes WHERE id = ? FOR UPDATE")) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new SQLException("El albaran no existe.");
+                }
+            }
+        }
+    }
+
+    /** La marca se confirma junto con el saldo, nunca en una transaccion separada. */
+    public boolean marcarLiquidado(int id, Connection conn) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE albaranes SET liquidado = 1 WHERE id = ? AND liquidado = 0")) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() == 1;
+        }
     }
 
     /** Encabezado + líneas (producto, cantidad aceptada y rechazada, precio). */
@@ -124,6 +152,7 @@ public class AlbaranDAO {
         a.setPersonaId(rs.getInt("persona_id"));
         a.setSedeId(rs.getInt("sede_id"));
         a.setFecha(rs.getTimestamp("fecha"));
+        a.setLiquidado(rs.getInt("liquidado") == 1);
         return a;
     }
 }

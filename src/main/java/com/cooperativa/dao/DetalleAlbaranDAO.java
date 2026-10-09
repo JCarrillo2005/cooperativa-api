@@ -43,11 +43,16 @@ public class DetalleAlbaranDAO {
     }
 
     public List<DetalleAlbaran> obtenerPorAlbaran(int albaranId) throws SQLException {
+        try (Connection conn = ConexionOracle.getConexion()) {
+            return obtenerPorAlbaran(albaranId, conn);
+        }
+    }
+
+    public List<DetalleAlbaran> obtenerPorAlbaran(int albaranId, Connection conn) throws SQLException {
         List<DetalleAlbaran> lista = new ArrayList<DetalleAlbaran>();
         String sql = "SELECT id, albaran_id, producto_id, cantidad_aceptada, cantidad_rechazada, precio_unitario "
                    + "FROM detalles_albaran WHERE albaran_id = ? ORDER BY id";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, albaranId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {

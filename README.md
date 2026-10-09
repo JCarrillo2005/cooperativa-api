@@ -53,7 +53,7 @@ Si al ejecutar comandos de Maven en tu terminal obtienes un error de que no se r
 ### 2. Configuración de la Base de Datos y Driver
 
 1. Asegúrate de tener una carpeta llamada **`lib`** en la raíz del proyecto (`/cooperativa-api/lib/`) conteniendo el archivo **`ojdbc14.jar`**.
-2. Asegúrate de colocar tu archivo de configuración **`config.properties`** tanto en la raíz del proyecto como en `src/main/resources/`. El archivo debe contener los siguientes parámetros de conexión a Oracle 10g:
+2. Coloca tu archivo local **`config.properties`** en la raíz del proyecto, desde donde ejecutas la API. `ConexionOracle` lee ese archivo del directorio de ejecución; no hace falta copiarlo a `src/main/resources/` ni incluirlo en el paquete de la aplicación. Está excluido de Git. El archivo debe contener los siguientes parámetros de conexión a Oracle 10g:
    ```properties
    db.url=jdbc:oracle:thin:@localhost:1521:XE
    db.user=tu_usuario
@@ -72,6 +72,32 @@ Ejecuta la aplicación Spring Boot:
 "mvn spring-boot:run"
 El servidor web iniciará por defecto en el puerto 8081:
 http://localhost:8081
+
+## Interfaz Tierra Fértil y correcciones de pagos
+
+La interfaz HTML, CSS y JavaScript está en `src/main/resources/static/` y se abre en
+`http://localhost:8081/` con el mismo servidor Spring Boot. Consume los endpoints
+existentes. La vista de diseño contiene datos ficticios; al conectar Oracle, muestra
+los registros que devuelve la API. Las fotografías y fuentes incluyen sus créditos
+y licencias junto a los recursos.
+
+Esta versión permite pagar un préstamo hasta saldo cero y registra cada albarán
+como pendiente o liquidado. Los abonos bloquean y releen el saldo para evitar
+sobrescrituras concurrentes. Las liquidaciones acreditan y marcan el albarán en
+una sola transacción, impidiendo volver a liquidarlo.
+
+**Antes de ejecutar este backend sobre una base existente**, aplicar
+[`scripts/08_fix_pagos_liquidaciones.sql`](scripts/08_fix_pagos_liquidaciones.sql)
+siguiendo [`scripts/LEEME_FIX_PAGOS.md`](scripts/LEEME_FIX_PAGOS.md). Para una base nueva,
+`scripts/01_schema_oracle.sql` ya contiene la estructura corregida. Si existen
+entregas antiguas con pagos, conciliar su estado antes de migrar; no volver a cargar
+los datos de ejemplo sobre una base existente.
+
+Las pruebas de negocio están en `src/test/java/com/cooperativa/FinancialOperationsIntegration.java`.
+Son una clase `main` de integración con Oracle, sin dependencias nuevas; no se
+ejecutan automáticamente con `mvn test`. Ver la guía para ejecutarlas exclusivamente
+en un esquema desechable `TF_QA_*`. La prueba del estado del formulario puede ejecutarse
+con `node src/test/frontend/liquidacion.test.cjs`.
 
 ## 📋 Endpoints de la API REST
 
