@@ -118,6 +118,18 @@ public class CuentaPersonaDAO {
         }
     }
 
+    /** Mantiene la pertenencia hasta finalizar la liquidacion, incluso ante un DELETE concurrente. */
+    public boolean perteneceYBloquear(int cuentaId, int personaId, Connection conn) throws SQLException {
+        String sql = "SELECT persona_id FROM cuentas_personas WHERE cuenta_id = ? AND persona_id = ? FOR UPDATE";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, cuentaId);
+            ps.setInt(2, personaId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
     private CuentaPersona mapear(ResultSet rs) throws SQLException {
         CuentaPersona cp = new CuentaPersona();
         cp.setCuentaId(rs.getInt("cuenta_id"));

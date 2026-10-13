@@ -2,14 +2,19 @@ package com.cooperativa.controller;
 
 import com.cooperativa.config.ConexionOracle;
 import com.cooperativa.dao.AlbaranDAO;
+import com.cooperativa.dao.CuentaDAO;
+import com.cooperativa.dao.CuentaPersonaDAO;
 import com.cooperativa.dao.DetalleAlbaranDAO;
 import com.cooperativa.dao.ProductoDAO;
 import com.cooperativa.dao.SedeDAO;
+import com.cooperativa.dao.SaldoDAO;
 import com.cooperativa.dao.TipoPersonaDAO;
 import com.cooperativa.model.Albaran;
+import com.cooperativa.model.Cuenta;
 import com.cooperativa.model.DetalleAlbaran;
 import com.cooperativa.model.Persona;
 import com.cooperativa.model.Producto;
+import com.cooperativa.model.Saldo;
 import com.cooperativa.model.TipoPersona;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -20,6 +25,9 @@ import java.util.List;
 public class AlbaranController {
 
     private final AlbaranDAO albaranDAO = new AlbaranDAO();
+    private final CuentaDAO cuentaDAO = new CuentaDAO();
+    private final CuentaPersonaDAO cuentaPersonaDAO = new CuentaPersonaDAO();
+    private final SaldoDAO saldoDAO = new SaldoDAO();
     private final DetalleAlbaranDAO detalleAlbaranDAO = new DetalleAlbaranDAO();
     private final ProductoDAO productoDAO = new ProductoDAO();
     private final TipoPersonaDAO tipoPersonaDAO = new TipoPersonaDAO();
@@ -131,14 +139,55 @@ public class AlbaranController {
      * directamente como depósito a una cuenta bancaria del socio.
      */
     public BigDecimal liquidarAlbaranEnCuenta(int albaranId, int cuentaId) throws NegocioException {
-        Albaran a = obtener(albaranId);
-        BigDecimal total = totalAPagar(a);
-        if (total.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new NegocioException("El albarán no posee producto aceptado para liquidar (total Q0.00).");
+        try {
+            // El catalogo se consulta antes de retener una conexion o bloqueos del pool.
+            int estatusActivo = Catalogos.estatusId(Catalogos.ESTATUS_ACTIVO);
+            try (Connection conn = ConexionOracle.getConexion()) {
+                conn.setAutoCommit(false);
+                try {
+                    albaranDAO.bloquear(albaranId, conn);
+                    Albaran a = albaranDAO.obtenerPorId(albaranId, conn);
+                    if (a == null) {
+                        throw new NegocioException("El albarán no existe.");
+                    }
+                    if (a.isLiquidado()) {
+                        throw new NegocioException("Este albarán ya fue liquidado. No se volverá a abonar.");
+                    }
+                    a.setDetalles(detalleAlbaranDAO.obtenerPorAlbaran(albaranId, conn));
+                    BigDecimal total = totalAPagar(a);
+                    if (total.signum() <= 0) {
+                        throw new NegocioException("El albarán no posee producto aceptado para liquidar (total Q0.00).");
+                    }
+                    // Siempre albaran -> cuenta -> relacion: evita invertir el orden de bloqueos.
+                    cuentaDAO.bloquear(cuentaId, conn);
+                    Cuenta cuenta = cuentaDAO.obtenerPorId(cuentaId, conn);
+                    if (cuenta == null) {
+                        throw new NegocioException("La cuenta no existe.");
+                    }
+                    if (cuenta.getEstatusId() != estatusActivo) {
+                        throw new NegocioException("La cuenta no está activa.");
+                    }
+                    if (!cuentaPersonaDAO.perteneceYBloquear(cuentaId, a.getPersonaId(), conn)) {
+                        throw new NegocioException("La cuenta no pertenece al socio de este albarán.");
+                    }
+                    Saldo actual = saldoDAO.obtenerActual(cuentaId, conn);
+                    BigDecimal base = actual == null ? BigDecimal.ZERO : actual.getMonto();
+                    if (!saldoDAO.registrar(new Saldo(0, cuentaId, base.add(total), null), conn)) {
+                        throw new SQLException("No se pudo registrar el saldo de la liquidacion.");
+                    }
+                    if (!albaranDAO.marcarLiquidado(albaranId, conn)) {
+                        throw new NegocioException("Este albarán ya fue liquidado. No se volverá a abonar.");
+                    }
+                    conn.commit();
+                    return total;
+                } catch (SQLException | RuntimeException | NegocioException e) {
+                    conn.rollback();
+                    throw e;
+                }
+            }
+        } catch (SQLException e) {
+            throw NegocioException.deSQL("No se pudo liquidar el albarán", e);
         }
-        CuentaController cuentaController = new CuentaController();
-        cuentaController.depositar(cuentaId, total);
-        return total;
     }
 
     // ---------- Consultas ----------

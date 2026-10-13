@@ -94,6 +94,9 @@ public class PrestamoController {
             throw new NegocioException("El monto del préstamo debe ser mayor que cero.");
         }
         p.setMonto(p.getMonto().setScale(2, RoundingMode.HALF_UP));
+        if (p.getMonto().signum() <= 0) {
+            throw new NegocioException("El monto del préstamo debe ser mayor que cero.");
+        }
     }
 
     /** Préstamo + descuento de stock + detalles: todo o nada. */
@@ -102,14 +105,18 @@ public class PrestamoController {
             conn.setAutoCommit(false);
             try {
                 prestamoDAO.guardar(p, conn);
-                for (DetallePrestamo d : p.getDetalles()) {
-                    if (!productoDAO.descontarStock(d.getProductoId(), d.getCantidad(), conn)) {
-                        Producto prod = productoDAO.obtenerPorId(d.getProductoId());
-                        throw new NegocioException("Stock insuficiente de '" + prod
-                            + "' (disponible: " + prod.getStock() + ").");
+                if (p.getDetalles() != null) {
+                    for (DetallePrestamo d : p.getDetalles()) {
+                        if (!productoDAO.descontarStock(d.getProductoId(), d.getCantidad(), conn)) {
+                            Producto prod = productoDAO.obtenerPorId(d.getProductoId());
+                            String nombre = prod != null ? prod.getNombre() : ("id " + d.getProductoId());
+                            int disponible = prod != null ? prod.getStock() : 0;
+                            throw new NegocioException("Stock insuficiente de '" + nombre
+                                + "' (disponible: " + disponible + ").");
+                        }
+                        d.setPrestamoId(p.getId());
+                        detallePrestamoDAO.guardar(d, conn);
                     }
-                    d.setPrestamoId(p.getId());
-                    detallePrestamoDAO.guardar(d, conn);
                 }
                 conn.commit();
             } catch (SQLException | RuntimeException | NegocioException e) {
@@ -140,27 +147,45 @@ public class PrestamoController {
      * Devuelve el saldo restante pendiente.
      */
     public BigDecimal registrarAbono(int prestamoId, BigDecimal montoAbono) throws NegocioException {
-        if (montoAbono == null || montoAbono.compareTo(BigDecimal.ZERO) <= 0) {
+        if (montoAbono == null) {
             throw new NegocioException("El monto del abono debe ser mayor que cero.");
         }
-        Prestamo p = obtener(prestamoId);
-        if (p.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new NegocioException("El préstamo no posee saldo pendiente por pagar.");
+        montoAbono = montoAbono.setScale(2, RoundingMode.HALF_UP);
+        if (montoAbono.signum() <= 0) {
+            throw new NegocioException("El monto del abono debe ser mayor que cero.");
         }
-        if (montoAbono.compareTo(p.getMonto()) > 0) {
-            throw new NegocioException("El abono (Q" + montoAbono.setScale(2, RoundingMode.HALF_UP)
-                + ") no puede superar el saldo pendiente actual (Q" + p.getMonto() + ").");
-        }
-
-        BigDecimal nuevoSaldo = p.getMonto().subtract(montoAbono).setScale(2, RoundingMode.HALF_UP);
-        p.setMonto(nuevoSaldo);
-
         try {
-            if (nuevoSaldo.compareTo(BigDecimal.ZERO) == 0) {
-                p.setEstatusId(Catalogos.estatusId("PAGADO"));
+            int estatusPagado = Catalogos.estatusId("PAGADO");
+            try (Connection conn = ConexionOracle.getConexion()) {
+                conn.setAutoCommit(false);
+                try {
+                    prestamoDAO.bloquear(prestamoId, conn);
+                    Prestamo p = prestamoDAO.obtenerPorId(prestamoId, conn);
+                    if (p == null) {
+                        throw new NegocioException("El préstamo no existe.");
+                    }
+                    if (p.getMonto().signum() <= 0) {
+                        throw new NegocioException("El préstamo no posee saldo pendiente por pagar.");
+                    }
+                    if (montoAbono.compareTo(p.getMonto()) > 0) {
+                        throw new NegocioException("El abono (Q" + montoAbono
+                            + ") no puede superar el saldo pendiente actual (Q" + p.getMonto() + ").");
+                    }
+                    BigDecimal nuevoSaldo = p.getMonto().subtract(montoAbono).setScale(2, RoundingMode.HALF_UP);
+                    p.setMonto(nuevoSaldo);
+                    if (nuevoSaldo.signum() == 0) {
+                        p.setEstatusId(estatusPagado);
+                    }
+                    if (!prestamoDAO.actualizar(p, conn)) {
+                        throw new NegocioException("El préstamo no existe.");
+                    }
+                    conn.commit();
+                    return nuevoSaldo;
+                } catch (SQLException | RuntimeException | NegocioException e) {
+                    conn.rollback();
+                    throw e;
+                }
             }
-            prestamoDAO.actualizar(p);
-            return nuevoSaldo;
         } catch (SQLException e) {
             throw NegocioException.deSQL("No se pudo registrar el abono al préstamo", e);
         }

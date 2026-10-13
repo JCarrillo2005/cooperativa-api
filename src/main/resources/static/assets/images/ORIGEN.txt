@@ -1,0 +1,95 @@
+FOTOGRAFÍAS DE DEMOSTRACIÓN · TIERRA FÉRTIL
+=========================================
+
+Fotografías reales de contexto agrícola, descargadas de Wikimedia Commons.
+No representan a socios, instalaciones ni propiedades de esta cooperativa.
+Los lugares representados se indican en cada crédito; varias fotografías
+proceden de otros países y se utilizan como referencias visuales de diseño.
+Ninguna imagen fue generada con IA.
+
+Cambios en las seis copias: reducción de resolución, conversión a JPEG
+progresivo y recompresión para web. Se conservaron la proporción y el encuadre
+originales, sin retoques de personas, objetos o escenarios. Se retiraron los
+metadatos EXIF de las copias optimizadas. Las licencias de las fotografías
+son las indicadas a continuación; no se sustituye su atribución por la marca
+de la cooperativa. Las copias bajo CC BY-SA conservan esa misma licencia.
+
+1. cafetal.jpg
+--------------
+Título: Café plantação Altinópolis.jpg
+Crédito: Jonathan Wilkins / Wikimedia Commons.
+Contexto: plantación de café cerca de Altinópolis, São Paulo, Brasil (2012).
+Licencia: Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0).
+Licencia URL: https://creativecommons.org/licenses/by-sa/3.0/
+Página de origen:
+https://commons.wikimedia.org/wiki/File:Caf%C3%A9_planta%C3%A7%C3%A3o_Altin%C3%B3polis.jpg
+Copia local: 2000 × 1333 px; 670213 bytes.
+
+2. agricultora.jpg
+-----------------
+Título: Agricultora de la comunidad de El Lirio 01.jpg
+Crédito: Candy Sotomayor / Wikimedia Commons.
+Contexto: agricultora en la comunidad de El Lirio, Cajamarca, Perú (2022).
+Licencia: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+Licencia URL: https://creativecommons.org/licenses/by-sa/4.0/
+Página de origen:
+https://commons.wikimedia.org/wiki/File:Agricultora_de_la_comunidad_de_El_Lirio_01.jpg
+Copia local: 1800 × 1200 px; 286510 bytes.
+
+3. cultivo.jpg
+--------------
+Título: Corn farmer 2.jpg
+Crédito: Tomas Castelazo / Wikimedia Commons.
+Contexto: agricultor arando con mulas. La ficha actual de Commons indica Guatemala.
+Licencia elegida entre las ofrecidas: Creative Commons Attribution 3.0 Unported
+(CC BY 3.0).
+Licencia URL: https://creativecommons.org/licenses/by/3.0/
+Página de origen:
+https://commons.wikimedia.org/wiki/File:Corn_farmer_2.jpg
+Copia local: 1200 × 800 px; 232804 bytes.
+
+4. familia-agricultora.jpg
+-------------------------
+Título: Cooked beans9 lo (4108173391).jpg
+Crédito: Neil Palmer / CIAT, vía Wikimedia Commons.
+Contexto: madre agricultora y su hija, suroeste de Uganda; familia productora
+de frijol. La relación familiar consta en la descripción de origen.
+Licencia: Creative Commons Attribution-ShareAlike 2.0 Generic (CC BY-SA 2.0).
+Licencia URL: https://creativecommons.org/licenses/by-sa/2.0/
+Página de origen:
+https://commons.wikimedia.org/wiki/File:Cooked_beans9_lo_(4108173391).jpg
+Copia local: 1000 × 664 px; 85861 bytes. Se mantuvo la anchura original;
+no se amplió artificialmente a 1200 px.
+
+5. centro-acopio.jpg
+-------------------
+Título: Thousands of bean bags.jpg
+Crédito: Pete Lewis / Department for International Development (DFID),
+vía Wikimedia Commons.
+Contexto: almacén de café de la Ethiopian Commodity Exchange en Awassa,
+Etiopía (2011). Referencia visual de recepción, almacenamiento y acopio.
+Licencia: Creative Commons Attribution 2.0 Generic (CC BY 2.0).
+Licencia URL: https://creativecommons.org/licenses/by/2.0/
+Página de origen:
+https://commons.wikimedia.org/wiki/File:Thousands_of_bean_bags.jpg
+Copia local: 1200 × 800 px; 157273 bytes.
+
+6. aguacate-hass.jpg
+-------------------
+Título: Avocado Hass - single and halved.jpg
+Crédito: Ivar Leidus / Wikimedia Commons.
+Contexto: aguacate de variedad Hass cultivado en Colombia (2022).
+La fotografía original utiliza apilado de enfoque de doce tomas; es una
+fotografía real de producto, no una imagen generada con IA.
+Licencia: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+Licencia URL: https://creativecommons.org/licenses/by-sa/4.0/
+Página de origen:
+https://commons.wikimedia.org/wiki/File:Avocado_Hass_-_single_and_halved.jpg
+Copia local: 1200 × 800 px; 120926 bytes.
+
+Verificación
+------------
+Autoría y licencia contrastadas con las fichas y la API imageinfo oficiales
+de Wikimedia Commons. Las seis copias finales fueron inspeccionadas
+visualmente. Peso total de las fotografías: 1553587 bytes (1.55 MB decimales).
+Todos los archivos de imagen pesan menos de 700000 bytes.

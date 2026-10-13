@@ -60,9 +60,14 @@ public class CuentaDAO {
     // ---------- READ ----------
 
     public Cuenta obtenerPorId(int id) throws SQLException {
+        try (Connection conn = ConexionOracle.getConexion()) {
+            return obtenerPorId(id, conn);
+        }
+    }
+
+    public Cuenta obtenerPorId(int id, Connection conn) throws SQLException {
         String sql = "SELECT " + COLUMNAS + " FROM cuentas WHERE id = ?";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {

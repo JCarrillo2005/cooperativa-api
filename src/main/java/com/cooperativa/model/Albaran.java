@@ -11,6 +11,7 @@ public class Albaran {
     private int personaId;        // socio que entrega
     private int sedeId;
     private Date fecha;
+    private boolean liquidado;
     private List<DetalleAlbaran> detalles = new ArrayList<DetalleAlbaran>();
 
     public Albaran() {}
@@ -29,6 +30,9 @@ public class Albaran {
 
     public Date getFecha() { return fecha; }
     public void setFecha(Date fecha) { this.fecha = fecha; }
+
+    public boolean isLiquidado() { return liquidado; }
+    public void setLiquidado(boolean liquidado) { this.liquidado = liquidado; }
 
     public List<DetalleAlbaran> getDetalles() { return detalles; }
     public void setDetalles(List<DetalleAlbaran> detalles) { this.detalles = detalles; }
