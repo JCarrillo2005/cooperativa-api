@@ -102,6 +102,12 @@ public class RespaldoService {
             fecha = LocalDateTime.now().format(FORMATO);
             enCurso = false;
         }
+        if (ok) {
+            System.out.println("Respaldo en caliente Oracle -> PostgreSQL completado (" + fecha + "): "
+                    + copia.size() + " tablas verificadas.");
+        } else {
+            System.err.println("Respaldo en caliente Oracle -> PostgreSQL fallido (" + fecha + "): " + texto);
+        }
         guardarEstado();
     }
 

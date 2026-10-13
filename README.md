@@ -112,7 +112,9 @@ conteos** de cada tabla en ambos lados y alinea las 14 secuencias. Si algo falla
 y Oracle queda intacto.
 
 - **Desde la interfaz**: módulo **Respaldo** → *Respaldar ahora*. Muestra el estado de PostgreSQL,
-  la fecha del último respaldo y las 15 tablas con sus filas verificadas.
+  la fecha del último respaldo y las 15 tablas con sus filas verificadas. Al terminar, el sistema
+  **anuncia en pantalla** que la migración se completó (o el motivo del fallo), aunque hayas cambiado
+  de módulo mientras se copiaba.
 - **Endpoints**: `GET /api/mantenimiento/respaldo` (estado) y `POST /api/mantenimiento/respaldo`
   (dispara el respaldo; `202` si arranca, `409` si ya hay uno en curso).
 - **Línea de comandos**:

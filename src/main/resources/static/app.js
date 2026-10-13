@@ -164,13 +164,20 @@
   let respaldoError = '';
   let respaldoConsultando = false;
   let respaldoSondeo = null;
+  let respaldoSolicitado = false;   // true solo si el respaldo lo pidió esta sesión (para avisar de su fin)
+  let respaldoAvisado = null;       // fecha del último respaldo ya anunciado (evita repetir el aviso)
+  let respaldoErrorAvisado = null;  // último error de conexión mostrado (evita repetir el aviso)
   const tieneConteo = (conteos,id) => Object.prototype.hasOwnProperty.call(conteos,id);
 
   function respaldo() {
     const encabezado = cabecera('06 / MANTENIMIENTO','Respaldo en caliente.','Copia consistente de Oracle a PostgreSQL mientras la cooperativa sigue operando.');
     if (!respaldoEstado) {
       const mensaje = respaldoError || 'El sistema consultará automáticamente el estado del respaldo.';
-      return encabezado + `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◍</span><h3>Sin información del respaldo</h3><p>${escapar(mensaje)}</p></div>`;
+      const boton = `<button class="btn btn-primary" type="button" data-respaldar ${respaldoConsultando ? 'disabled' : ''}><span aria-hidden="true">↻</span> Respaldar ahora</button>`;
+      return encabezado
+        + `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◍</span><h3>Sin información del respaldo</h3><p>${escapar(mensaje)}</p></div>`
+        + `<div class="action-row">${boton}</div>`
+        + '<p class="muted">Aunque todavía no haya una ejecución registrada, puedes lanzar el respaldo: el sistema avisará al terminar.</p>';
     }
     const e = respaldoEstado;
     const conteos = e.conteos || {};
@@ -193,19 +200,43 @@
 
   function programarSondeo() {
     clearTimeout(respaldoSondeo);
-    if (estado.vista !== 'respaldo') return;
+    if (!respaldoEstado || !respaldoEstado.enCurso) return;
+    // Se sondea aunque el usuario cambie de módulo: así el aviso de finalización llega igual.
     respaldoSondeo = setTimeout(cargarRespaldo,2500);
   }
 
   async function cargarRespaldo() {
     if (respaldoConsultando) return;
     respaldoConsultando = true;
-    try { respaldoEstado = await window.ServicioCooperativa.estadoRespaldo(); respaldoError = ''; }
+    try { respaldoEstado = await window.ServicioCooperativa.estadoRespaldo(); respaldoError = ''; respaldoErrorAvisado = null; }
     catch (error) { respaldoEstado = null; respaldoError = error.message; }
     finally { respaldoConsultando = false; }
-    if (estado.vista !== 'respaldo') return;
-    renderizar({animar:false});
-    if (respaldoEstado && respaldoEstado.enCurso) programarSondeo();
+    // Si el estado no se pudo consultar (p. ej. la API está detenida), avísalo una vez.
+    if (respaldoError && respaldoError !== respaldoErrorAvisado) {
+      respaldoErrorAvisado = respaldoError;
+      anunciar(respaldoError,8000);
+    }
+    avisarRespaldo();
+    if (estado.vista === 'respaldo') renderizar({animar:false});
+    programarSondeo();
+  }
+
+  // Anuncia el fin del respaldo una sola vez, cuando pasa de "en curso" a terminado.
+  function avisarRespaldo() {
+    const e = respaldoEstado;
+    if (!e || e.enCurso || !e.fecha) return;
+    if (e.fecha === respaldoAvisado) return;
+    respaldoAvisado = e.fecha;                  // el estado ya visto no se vuelve a anunciar
+    if (!respaldoSolicitado) return;            // respaldos anteriores a esta sesión no generan aviso
+    respaldoSolicitado = false;
+    const conteos = e.conteos || {};
+    if (e.exitoso) {
+      const verificadas = TABLAS_RESPALDO.filter(([id]) => tieneConteo(conteos,id)).length;
+      const total = TABLAS_RESPALDO.reduce((suma,[id]) => suma + (tieneConteo(conteos,id) ? Number(conteos[id]) : 0),0);
+      anunciar(`Migración completada correctamente: ${verificadas} de 15 tablas y ${numero(total)} filas copiadas en PostgreSQL.`,9000);
+    } else {
+      anunciar(`La migración no se pudo completar: ${e.mensaje || 'revisa la vista de Respaldo.'}`,9000);
+    }
   }
 
   async function ejecutarRespaldo() {
@@ -213,6 +244,7 @@
     respaldoConsultando = true;
     try {
       respaldoEstado = await window.ServicioCooperativa.ejecutarRespaldo();
+      respaldoSolicitado = true;
       anunciar('Respaldo iniciado. Puedes seguir usando el sistema mientras se copia la base de datos.');
     } catch (error) {
       anunciar(error.status === 409 ? 'Ya hay un respaldo en ejecución.' : error.message);
@@ -271,7 +303,7 @@
   }
   function navegar(vista) {
     if (!vistas[vista]) return;
-    clearTimeout(respaldoSondeo);
+    if (!(respaldoEstado && respaldoEstado.enCurso)) clearTimeout(respaldoSondeo);
     estado.vista = vista; estado.filtro = 'todos'; estado.busqueda = ''; $('#busqueda-global').value = '';
     renderizar();
     if (vista === 'respaldo') cargarRespaldo();
@@ -280,7 +312,7 @@
     $('#contenido').focus({preventScroll:true});
   }
   let temporizador;
-  function anunciar(mensaje) {clearTimeout(temporizador); $('#notificacion').textContent=mensaje; $('#notificacion').classList.add('visible'); temporizador=setTimeout(()=>$('#notificacion').classList.remove('visible'),6000);}
+  function anunciar(mensaje,duracion=6000) {clearTimeout(temporizador); $('#notificacion').textContent=mensaje; $('#notificacion').classList.add('visible'); temporizador=setTimeout(()=>$('#notificacion').classList.remove('visible'),duracion);}
   function abrirDialogo(titulo,contenido) {$('#titulo-dialogo').textContent=titulo; $('#cuerpo-dialogo').innerHTML=contenido; $('#dialogo').showModal();document.dispatchEvent(new CustomEvent('tierra:dialogo'));}
   const avisoFormulario = () => estado.modo === 'conectado' ? '<p class="muted">Los cambios se registrarán en la base de datos de la cooperativa.</p>' : '<p class="notice">El sistema aún no está conectado. Espera a que termine la consulta para guardar.</p>';
   function verDetalle(tipo,id) {
@@ -400,7 +432,7 @@
     if (estado.guardando) return;
     if(estado.cargando && (b.dataset.nuevo || b.dataset.editar || b.dataset.operacion)){anunciar('Espera a que termine la consulta para abrir el formulario.');return;}
     if (b.dataset.vista) navegar(b.dataset.vista);
-    if (b.dataset.respaldar) ejecutarRespaldo();
+    if (b.hasAttribute('data-respaldar')) ejecutarRespaldo();
     if (b.dataset.filtro) {estado.filtro=b.dataset.filtro;renderizar({animar:false});}
     if (b.hasAttribute('data-limpiar')) {estado.filtro='todos';estado.busqueda='';estado.sede='';$('#busqueda-global').value='';$('#selector-sede').value='';renderizar({animar:false});}
     if (b.dataset.detalle) verDetalle(b.dataset.detalle,b.dataset.id);
