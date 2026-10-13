@@ -64,3 +64,7 @@ config.properties
 
 # (Opcional) Si prefieres que el driver local no se suba al repositorio público:
 # /lib/ojdbc14.jar
+
+# --- Respaldo en caliente (Fase IV) ---
+# Estado del último respaldo y el .sql de ajuste de secuencias generado al recuperar.
+backups/

@@ -7,7 +7,7 @@
   const $ = (selector, base = document) => base.querySelector(selector);
   const $$ = (selector, base = document) => [...base.querySelectorAll(selector)];
   const escapar = valor => String(valor ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const nombres = {panel:'Panel general',personas:'Personas',cuentas:'Cuentas',prestamos:'Préstamos',productos:'Productos',albaranes:'Albaranes'};
+  const nombres = {panel:'Panel general',personas:'Personas',cuentas:'Cuentas',prestamos:'Préstamos',productos:'Productos',albaranes:'Albaranes',respaldo:'Respaldo'};
   const estado = {vista:'panel',datos:null,sede:'',busqueda:'',filtro:'todos',modo:'desconectado',cargando:false,guardando:false};
   const vacio = {catalogos:{sedes:[],estatus:[],tiposPersona:[],tiposCuenta:[],tiposPrestamo:[],categoriasProducto:[]},personas:[],cuentas:[],cuentasPersonas:[],saldos:[],prestamos:[],productos:[],albaranes:[]};
   const datos = () => estado.datos || vacio;
@@ -150,7 +150,77 @@
     const lista = registros('albaranes');
     return cabecera('05 / RECEPCIÓN Y CALIDAD','El valor de cada cosecha.','Registra lo aceptado y lo rechazado en el mismo albarán.',nuevo('albaranes','Registrar entrega')) + `<div class="harvest-note"><span class="harvest-mark" aria-hidden="true">✳</span><div><h2>De la entrega al valor justo.</h2><p>El total se calcula únicamente sobre la cantidad aceptada de cada producto.</p></div></div>` + `<div class="toolbar"><span class="eyebrow">TALONARIOS DE ENTREGA</span><span class="muted">${lista.length} registros</span></div>` + tabla(['Talonario','Fecha','Socio','Sede','Aceptado','Rechazado','Total a pagar',''],lista.map(a => `<tr><td class="code"><strong>${escapar(a.numeroTalonario)}</strong></td><td>${fecha(a.fecha)}</td><td>${escapar(persona(a.personaId))}</td><td>${escapar(sede(a.sedeId))}</td><td>${numero(a.detalles.reduce((s,d)=>s+Number(d.cantidadAceptada),0))} kg</td><td>${numero(a.detalles.reduce((s,d)=>s+Number(d.cantidadRechazada),0))} kg</td><td class="amount">${monedaCentavos(totalAlbaran(a))}</td><td>${botonVer('albaranes',a.id,'Ver albarán')}</td></tr>`));
   }
-  const vistas = {panel,personas,cuentas,prestamos,productos,albaranes};
+  // --- Respaldo en caliente (Fase IV): estado y disparo desde la interfaz ---
+  // Tablas en el mismo orden del contrato Java (EsquemaRespaldo), con etiqueta legible.
+  const TABLAS_RESPALDO = [
+    ['sedes','Sedes'],['estatus','Estatus'],['tipos_persona','Tipos de persona'],
+    ['tipos_cuenta','Tipos de cuenta'],['tipos_prestamo','Tipos de préstamo'],
+    ['categorias_producto','Categorías de producto'],['personas','Personas'],
+    ['productos','Productos'],['cuentas','Cuentas'],['cuentas_personas','Titulares de cuenta'],
+    ['saldos','Saldos'],['prestamos','Préstamos'],['detalles_prestamo','Detalles de préstamo'],
+    ['albaranes','Albaranes'],['detalles_albaran','Detalles de albarán']
+  ];
+  let respaldoEstado = null;
+  let respaldoError = '';
+  let respaldoConsultando = false;
+  let respaldoSondeo = null;
+  const tieneConteo = (conteos,id) => Object.prototype.hasOwnProperty.call(conteos,id);
+
+  function respaldo() {
+    const encabezado = cabecera('06 / MANTENIMIENTO','Respaldo en caliente.','Copia consistente de Oracle a PostgreSQL mientras la cooperativa sigue operando.');
+    if (!respaldoEstado) {
+      const mensaje = respaldoError || 'El sistema consultará automáticamente el estado del respaldo.';
+      return encabezado + `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◍</span><h3>Sin información del respaldo</h3><p>${escapar(mensaje)}</p></div>`;
+    }
+    const e = respaldoEstado;
+    const conteos = e.conteos || {};
+    const verificadas = TABLAS_RESPALDO.filter(([id]) => tieneConteo(conteos,id)).length;
+    const total = TABLAS_RESPALDO.reduce((suma,[id]) => suma + (tieneConteo(conteos,id) ? Number(conteos[id]) : 0),0);
+    const aviso = e.enCurso
+      ? '<p class="notice">El respaldo está en curso. Puedes seguir trabajando; aquí verás los conteos verificados al terminar.</p>'
+      : (e.fecha && !e.exitoso ? `<p class="notice">${escapar(e.mensaje || 'El último respaldo no se completó.')}</p>` : '');
+    const insigniaEstado = e.enCurso ? '<span class="badge badge-warning">En curso</span>'
+      : (e.fecha ? (e.exitoso ? '<span class="badge badge-success">Completado</span>' : '<span class="badge badge-neutral">Con error</span>')
+                 : '<span class="badge badge-neutral">Sin ejecutar</span>');
+    const boton = `<button class="btn btn-primary" type="button" data-respaldar ${(e.enCurso || respaldoConsultando) ? 'disabled' : ''}><span aria-hidden="true">↻</span> ${e.enCurso ? 'Respaldando…' : 'Respaldar ahora'}</button>`;
+    const filas = TABLAS_RESPALDO.map(([id,etiqueta]) => `<tr><td>${escapar(etiqueta)}</td><td class="code">${escapar(id)}</td><td class="amount">${tieneConteo(conteos,id) ? numero(conteos[id]) : '—'}</td></tr>`);
+    return encabezado + aviso
+      + `<div class="summary-card"><span class="eyebrow">ÚLTIMA EJECUCIÓN</span><strong>${e.fecha ? escapar(e.fecha) : '—'}</strong>${insigniaEstado}<p>${e.postgresAlcanzable ? 'La base de respaldo en PostgreSQL está disponible.' : 'No se pudo contactar PostgreSQL. Revisa config.properties y que el servicio esté activo.'}</p><p class="muted">${verificadas} de 15 tablas verificadas · ${numero(total)} filas copiadas.</p></div>`
+      + tabla(['Tabla','Nombre técnico','Filas copiadas'],filas)
+      + `<div class="action-row">${boton}</div>`
+      + '<p class="muted">La recuperación (PostgreSQL → Oracle) es una operación de mantenimiento: requiere la API detenida y un esquema Oracle nuevo y vacío, por eso no se ejecuta desde esta pantalla. Ver <code>scripts/README.md</code>.</p>';
+  }
+
+  function programarSondeo() {
+    clearTimeout(respaldoSondeo);
+    if (estado.vista !== 'respaldo') return;
+    respaldoSondeo = setTimeout(cargarRespaldo,2500);
+  }
+
+  async function cargarRespaldo() {
+    if (respaldoConsultando) return;
+    respaldoConsultando = true;
+    try { respaldoEstado = await window.ServicioCooperativa.estadoRespaldo(); respaldoError = ''; }
+    catch (error) { respaldoEstado = null; respaldoError = error.message; }
+    finally { respaldoConsultando = false; }
+    if (estado.vista !== 'respaldo') return;
+    renderizar({animar:false});
+    if (respaldoEstado && respaldoEstado.enCurso) programarSondeo();
+  }
+
+  async function ejecutarRespaldo() {
+    if (respaldoConsultando || (respaldoEstado && respaldoEstado.enCurso)) return;
+    respaldoConsultando = true;
+    try {
+      respaldoEstado = await window.ServicioCooperativa.ejecutarRespaldo();
+      anunciar('Respaldo iniciado. Puedes seguir usando el sistema mientras se copia la base de datos.');
+    } catch (error) {
+      anunciar(error.status === 409 ? 'Ya hay un respaldo en ejecución.' : error.message);
+    } finally { respaldoConsultando = false; }
+    await cargarRespaldo();
+  }
+
+  const vistas = {panel,personas,cuentas,prestamos,productos,albaranes,respaldo};
   let versionCarga = 0;
   function actualizarAviso(mensaje) {
     const online=estado.modo==='conectado';
@@ -201,8 +271,10 @@
   }
   function navegar(vista) {
     if (!vistas[vista]) return;
+    clearTimeout(respaldoSondeo);
     estado.vista = vista; estado.filtro = 'todos'; estado.busqueda = ''; $('#busqueda-global').value = '';
     renderizar();
+    if (vista === 'respaldo') cargarRespaldo();
     if (window.MovimientoTierra) window.MovimientoTierra.irAlInicio();
     else window.scrollTo({top:0,behavior:'instant'});
     $('#contenido').focus({preventScroll:true});
@@ -328,6 +400,7 @@
     if (estado.guardando) return;
     if(estado.cargando && (b.dataset.nuevo || b.dataset.editar || b.dataset.operacion)){anunciar('Espera a que termine la consulta para abrir el formulario.');return;}
     if (b.dataset.vista) navegar(b.dataset.vista);
+    if (b.dataset.respaldar) ejecutarRespaldo();
     if (b.dataset.filtro) {estado.filtro=b.dataset.filtro;renderizar({animar:false});}
     if (b.hasAttribute('data-limpiar')) {estado.filtro='todos';estado.busqueda='';estado.sede='';$('#busqueda-global').value='';$('#selector-sede').value='';renderizar({animar:false});}
     if (b.dataset.detalle) verDetalle(b.dataset.detalle,b.dataset.id);
@@ -345,7 +418,7 @@
   document.addEventListener('input',evento=>{if(evento.target.closest('#lineas-formulario')) actualizarTotal();});
   $('#busqueda-global').addEventListener('input',evento=>{estado.busqueda=evento.target.value;renderizar({animar:false});});
   $('#selector-sede').addEventListener('change',evento=>{estado.sede=evento.target.value;renderizar({animar:false});});
-  $('#recargar').addEventListener('click',()=>conectar());
+  $('#recargar').addEventListener('click',()=>{conectar();if(estado.vista==='respaldo')cargarRespaldo();});
   $('#cerrar-dialogo').addEventListener('click',()=>{if(!estado.guardando)$('#dialogo').close();});
   $('#dialogo').addEventListener('cancel',evento=>{if(estado.guardando)evento.preventDefault();});
   $('#dialogo').addEventListener('click',evento=>{if(!estado.guardando && evento.target===$('#dialogo')){const r=evento.target.getBoundingClientRect();if(evento.clientX<r.left||evento.clientX>r.right||evento.clientY<r.top||evento.clientY>r.bottom) evento.target.close();}});

@@ -35,7 +35,16 @@
             <scope>system</scope>
             <systemPath>${project.basedir}/lib/ojdbc14.jar</systemPath>
         </dependency>
-        
+
+        <!-- Driver PostgreSQL 42.7.13 Local (Fase IV: respaldo en caliente) -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.13</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/postgresql-42.7.13.jar</systemPath>
+        </dependency>
+
     </dependencies>
 
     <build>

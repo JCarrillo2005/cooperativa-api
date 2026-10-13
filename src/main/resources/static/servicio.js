@@ -216,6 +216,15 @@
     return pedir('/' + tipo + '/' + identificador(id), 'DELETE', undefined, true);
   }
 
+  // Mantenimiento (Fase IV): estado y disparo del respaldo en caliente Oracle -> PostgreSQL.
+  function estadoRespaldo() {
+    return pedir('/mantenimiento/respaldo');
+  }
+
+  function ejecutarRespaldo() {
+    return pedir('/mantenimiento/respaldo', 'POST');
+  }
+
   // Importar este archivo nunca inicia consultas ni carga datos de ejemplo.
-  window.ServicioCooperativa = Object.freeze({ cargar, guardar, operar, quitarPersona, eliminar });
+  window.ServicioCooperativa = Object.freeze({ cargar, guardar, operar, quitarPersona, eliminar, estadoRespaldo, ejecutarRespaldo });
 }());

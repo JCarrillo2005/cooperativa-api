@@ -12,6 +12,7 @@ API REST desarrollada con **Spring Boot 2.7.18** y **Java 8**, diseñada para mi
 - **Préstamos**: Gestión de créditos en efectivo y de consumo de productos con descuento automático de inventario.
 - **Albaranes (Entregas de Cosecha)**: Registro de entregas de socios, validación por talonario y liquidación directa a cuentas bancarias.
 - **Catálogos Dinámicos**: Endpoints para alimentar menús desplegables (Sedes, Estatus, Tipos de Cuenta, etc.).
+- **Respaldo en Caliente (Fase IV)**: Copia consistente Oracle → PostgreSQL sin detener la operación, disparable desde la interfaz web o por línea de comandos.
 
 ---
 
@@ -20,7 +21,8 @@ API REST desarrollada con **Spring Boot 2.7.18** y **Java 8**, diseñada para mi
 - **Java Development Kit (JDK)**: Temurin JDK 1.8 (Java 8).
 - **Apache Maven**: Versión 3.x para la gestión de dependencias y ejecución del proyecto.
 - **Base de Datos**: Oracle 10g (activo y accesible mediante JDBC).
-- **Driver JDBC**: `ojdbc14.jar` (alojado localmente en el directorio `/lib`).
+- **Base secundaria (Fase IV)**: PostgreSQL 18 para el respaldo/migración (opcional para el CRUD).
+- **Drivers JDBC**: `ojdbc14.jar` y `postgresql-42.7.13.jar` (alojados localmente en el directorio `/lib`).
 
 ---
 
@@ -101,6 +103,31 @@ ejecutan automáticamente con `mvn test`. Ver la guía para ejecutarlas exclusiv
 en un esquema desechable `TF_QA_*`. La prueba del estado del formulario puede ejecutarse
 con `node src/test/frontend/liquidacion.test.cjs`.
 
+## 🔥 Fase IV · Respaldo en caliente Oracle → PostgreSQL
+
+Copia consistente de las 15 tablas desde Oracle a una base **PostgreSQL** secundaria **mientras la
+cooperativa sigue operando**. Es *en caliente* porque Oracle no se detiene: el respaldo abre una
+sesión `READ ONLY` que fija una **foto** de los datos, copia en lotes de 250, **verifica los
+conteos** de cada tabla en ambos lados y alinea las 14 secuencias. Si algo falla, todo se revierte
+y Oracle queda intacto.
+
+- **Desde la interfaz**: módulo **Respaldo** → *Respaldar ahora*. Muestra el estado de PostgreSQL,
+  la fecha del último respaldo y las 15 tablas con sus filas verificadas.
+- **Endpoints**: `GET /api/mantenimiento/respaldo` (estado) y `POST /api/mantenimiento/respaldo`
+  (dispara el respaldo; `202` si arranca, `409` si ya hay uno en curso).
+- **Línea de comandos**:
+  ```powershell
+  java -cp "target\classes;lib\ojdbc14.jar;lib\postgresql-42.7.13.jar" com.cooperativa.utils.BackupEnCaliente respaldar
+  ```
+
+La **recuperación** (PostgreSQL → Oracle) no se expone en la interfaz a propósito: exige la API
+detenida y un esquema Oracle **nuevo y vacío**, por lo que se ejecuta por CLI. La configuración
+(`pg.*` y `restore.oracle.*` en `config.properties`) y las recetas completas —crear la base,
+cargar el esquema `09`–`12` y ejecutar respaldo/recuperación— están en
+[`scripts/README.md`](scripts/README.md) (Recetas C y D).
+
+---
+
 ## 📋 Endpoints de la API REST
 
 ### 1. Personas y Socios
@@ -160,3 +187,9 @@ con `node src/test/frontend/liquidacion.test.cjs`.
 - GET /api/catalogos/tipos-prestamo
 
 - GET /api/catalogos/categorias-producto
+
+### Mantenimiento (Fase IV)
+
+- GET /api/mantenimiento/respaldo — Estado del respaldo: en curso, último resultado, conteos por tabla y disponibilidad de PostgreSQL.
+
+- POST /api/mantenimiento/respaldo — Dispara la copia Oracle → PostgreSQL (202 al iniciar, 409 si ya hay una en curso).
