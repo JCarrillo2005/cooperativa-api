@@ -4,6 +4,10 @@ Todos estos archivos son de **ejecución manual**: la aplicación Spring Boot **
 automáticamente** (no hay Flyway, Liquibase ni `schema.sql`). La API solo se conecta a Oracle y
 hace CRUD; las tablas y los datos deben existir antes de arrancarla.
 
+Los scripts `01`, `02`, `07`, `08` son para **Oracle** (base principal, con SQL\*Plus). Los
+scripts `09`–`12` son para **PostgreSQL** (base secundaria de respaldo/migración, con `psql`) y
+los usa la **Fase IV** (respaldo en caliente).
+
 Se ejecutan con **SQL\*Plus** (o SQL Developer), en una **sesión nueva**, conectado al
 **esquema propietario** (`COOPERATIVA`), y **con la API detenida** mientras se modifica estructura.
 
@@ -105,15 +109,93 @@ Luego volver a ejecutar `08`; él fijará `DEFAULT 0`, `NOT NULL` y el `CHECK`.
 
 ---
 
+## Receta C · Respaldo en caliente y migración a PostgreSQL (Fase IV)
+
+Copia consistente de **Oracle → PostgreSQL** mientras la cooperativa sigue operando. Es
+*en caliente* porque Oracle no se detiene: `SET TRANSACTION READ ONLY` fija una **foto** de las
+15 tablas y la API puede seguir atendiendo (las escrituras posteriores entran en la siguiente
+copia). La base PostgreSQL es **exclusiva para respaldo**: cada ejecución reemplaza su contenido.
+
+### C.0 Requisitos (una sola vez)
+
+1. **Servidor PostgreSQL** instalado y activo (aquí, PostgreSQL 18 en `localhost:5432`).
+2. **Rol y base** de respaldo:
+
+   ```sql
+   CREATE ROLE cooperativa LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD 'TU_CLAVE';
+   CREATE DATABASE cooperativa_respaldo OWNER cooperativa ENCODING 'UTF8';
+   ```
+
+3. **Driver** `lib/postgresql-42.7.13.jar` presente (junto a `lib/ojdbc14.jar`).
+4. **Credenciales** en `config.properties` (raíz, excluido de Git):
+
+   ```properties
+   pg.url=jdbc:postgresql://localhost:5432/cooperativa_respaldo
+   pg.user=cooperativa
+   pg.password=TU_CLAVE
+   ```
+
+### C.1 Preparar el esquema PostgreSQL
+
+```powershell
+$env:PGPASSWORD = "TU_CLAVE"
+$psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
+& $psql -U cooperativa -h localhost -p 5432 -d cooperativa_respaldo -f scripts\09_schema_postgresql.sql
+```
+
+`09` es el **espejo** del esquema Oracle, ya con `albaranes.liquidado` y `ck_pre_monto (monto >= 0)`.
+Los scripts `10` (datos demo) y `12` (verificación) son opcionales para probar PostgreSQL solo;
+el respaldo los reemplaza/ignora. `11` borra los objetos del proyecto.
+
+### C.2 Ejecutar el respaldo
+
+**Desde la interfaz web:** módulo **Respaldo** → botón *Respaldar ahora*. Muestra el estado de
+PostgreSQL, la fecha del último respaldo y las 15 tablas con sus filas verificadas.
+
+**Desde línea de comandos** (misma máquina, desde la raíz del proyecto):
+
+```powershell
+$cp = "target\classes;lib\ojdbc14.jar;lib\postgresql-42.7.13.jar"
+java -cp $cp com.cooperativa.utils.BackupEnCaliente respaldar
+```
+
+Qué hace, en orden: bloquea el respaldo (advisory lock), borra las tablas destino de hijos a
+padres, copia de padres a hijos en lotes de 250, **compara el conteo de filas** en ambos lados,
+alinea las 14 secuencias y confirma el destino. Si algo falla, **todo se revierte** y Oracle queda
+intacto. Si ya hay un respaldo/recuperación en curso, el segundo se rechaza (SQLState `55P03`).
+
+---
+
+## Receta D · Recuperación (PostgreSQL → Oracle) — solo mantenimiento
+
+No se expone en la interfaz a propósito: exige **la API detenida** y un **esquema Oracle nuevo y
+vacío** (nunca el esquema en uso, ni `SYS`/`SYSTEM`). Complete en `config.properties` el bloque
+`restore.oracle.*` y ejecute:
+
+```powershell
+$cp = "target\classes;lib\ojdbc14.jar;lib\postgresql-42.7.13.jar"
+java -cp $cp com.cooperativa.utils.BackupEnCaliente recuperar backups\recuperacion_secuencias.sql
+```
+
+Comprueba que el esquema destino esté vacío, copia y confirma los datos, y genera un `.sql`
+**aparte** para ajustar las secuencias Oracle (porque `ALTER SEQUENCE` confirma implícitamente).
+Ese archivo se ejecuta **después**, con la aplicación aún detenida.
+
+---
+
 ## Catálogo de scripts
 
-| Archivo | Rol | ¿Crear BD nueva? | ¿Migrar BD vieja? |
-|---|---|---|---|
-| `01_schema_oracle.sql` | DDL: 15 tablas + restricciones + secuencias | ✅ (esquema vacío) | ❌ |
-| `02_initial_data.sql` | 38 filas demo ficticias | ✅ (una vez, tablas vacías) | ❌ |
-| `07_verify_oracle.sql` | Verificación de integridad (75 rechazos + 4 válidos) | ✅ opcional | ❌ |
-| `08_fix_pagos_liquidaciones.sql` | Migración: `liquidado` + `monto >= 0` | ❌ | ✅ |
-| `LEEME_FIX_PAGOS.md` | Manual del responsable (conciliación, QA, pruebas) | manual | manual |
+| Archivo | Base | Rol |
+|---|---|---|
+| `01_schema_oracle.sql` | Oracle | DDL: 15 tablas + restricciones + secuencias (esquema vacío). |
+| `02_initial_data.sql` | Oracle | 38 filas demo ficticias (una vez, tablas vacías). |
+| `07_verify_oracle.sql` | Oracle | Verificación de integridad (75 rechazos + 4 válidos). |
+| `08_fix_pagos_liquidaciones.sql` | Oracle | Migración: `liquidado` + `monto >= 0` (BD antigua). |
+| `09_schema_postgresql.sql` | PostgreSQL | Espejo del esquema para respaldo/migración (esquema vacío). |
+| `10_initial_data_postgresql.sql` | PostgreSQL | Datos demo (opcional, para probar PostgreSQL solo). |
+| `11_drop_all_postgresql.sql` | PostgreSQL | Elimina los objetos del proyecto en PostgreSQL. |
+| `12_verify_postgresql.sql` | PostgreSQL | Verificación: 15 PK, 19 FK y 21 casos. |
+| `LEEME_FIX_PAGOS.md` | — | Manual del responsable (conciliación, QA, pruebas). |
 
 ## Reglas de oro
 
@@ -125,3 +207,13 @@ Luego volver a ejecutar `08`; él fijará `DEFAULT 0`, `NOT NULL` y el `CHECK`.
 - Guardar los resultados de las ejecuciones reales como evidencia.
 - Los scripts son operación de base de datos **manual**; no forman parte del arranque de la
   aplicación.
+
+### Respaldo (Fase IV)
+
+- `pg.url` debe apuntar a una base **exclusiva de respaldo**; nunca a una con datos ajenos:
+  cada respaldo **reemplaza** su contenido.
+- El respaldo usa **conexiones físicas propias** (no el pool de la API) y exige `SET TRANSACTION
+  READ ONLY` como **primera** sentencia de la sesión Oracle; no lo invoque desde dentro de una
+  transacción.
+- No exponga en la interfaz una acción de **recuperación**: requiere la API detenida y un esquema
+  Oracle vacío. Se ejecuta por CLI (Receta D).
