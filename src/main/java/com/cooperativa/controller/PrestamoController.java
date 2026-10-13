@@ -105,14 +105,18 @@ public class PrestamoController {
             conn.setAutoCommit(false);
             try {
                 prestamoDAO.guardar(p, conn);
-                for (DetallePrestamo d : p.getDetalles()) {
-                    if (!productoDAO.descontarStock(d.getProductoId(), d.getCantidad(), conn)) {
-                        Producto prod = productoDAO.obtenerPorId(d.getProductoId());
-                        throw new NegocioException("Stock insuficiente de '" + prod
-                            + "' (disponible: " + prod.getStock() + ").");
+                if (p.getDetalles() != null) {
+                    for (DetallePrestamo d : p.getDetalles()) {
+                        if (!productoDAO.descontarStock(d.getProductoId(), d.getCantidad(), conn)) {
+                            Producto prod = productoDAO.obtenerPorId(d.getProductoId());
+                            String nombre = prod != null ? prod.getNombre() : ("id " + d.getProductoId());
+                            int disponible = prod != null ? prod.getStock() : 0;
+                            throw new NegocioException("Stock insuficiente de '" + nombre
+                                + "' (disponible: " + disponible + ").");
+                        }
+                        d.setPrestamoId(p.getId());
+                        detallePrestamoDAO.guardar(d, conn);
                     }
-                    d.setPrestamoId(p.getId());
-                    detallePrestamoDAO.guardar(d, conn);
                 }
                 conn.commit();
             } catch (SQLException | RuntimeException | NegocioException e) {

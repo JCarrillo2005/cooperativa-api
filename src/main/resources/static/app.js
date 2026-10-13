@@ -1,5 +1,6 @@
 /* Presentación web sobre los controllers REST existentes.
- * Las operaciones se confirman en la API; la vista de ejemplo nunca guarda datos.
+ * Los datos se cargan exclusivamente desde la API (que consulta Oracle al
+ * abrir la aplicación); no existen datos de ejemplo ni botón de conexión.
  */
 (() => {
   'use strict';
@@ -60,7 +61,7 @@
   const cabecera = (etiqueta,titulo,descripcion,accion='') => `<div class="section-heading"><div><p class="eyebrow">${etiqueta}</p><h1>${titulo}</h1><p class="muted">${descripcion}</p></div>${accion}</div>`;
   const nuevo = (tipo,texto) => `<button class="btn btn-primary" type="button" data-nuevo="${tipo}"><span aria-hidden="true">＋</span> ${texto}</button>`;
   function tabla(columnas,filas,mensaje='No hay registros para esta selección.') {
-    if (!filas.length) return `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◎</span><h3>${estado.datos ? 'Sin resultados' : 'Todo está listo para empezar'}</h3><p>${estado.datos ? mensaje : 'Los registros aparecerán al conectar el servicio del proyecto. Puedes explorar el diseño con sus datos de prueba.'}</p>${estado.datos ? '<button class="btn btn-secondary" data-limpiar>Limpiar filtros</button>' : '<button class="btn btn-secondary" data-ejemplo>Ver datos de prueba</button>'}</div>`;
+    if (!filas.length) return `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◎</span><h3>${estado.datos ? 'Sin resultados' : 'Consultando los registros…'}</h3><p>${estado.datos ? mensaje : 'El sistema se está conectando con la base de datos de la cooperativa.'}</p>${estado.datos ? '<button class="btn btn-secondary" data-limpiar>Limpiar filtros</button>' : ''}</div>`;
     return `<div class="table-wrap" tabindex="0" aria-label="Tabla de registros"><table class="data-table"><thead><tr>${columnas.map(c => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${filas.join('')}</tbody></table></div>`;
   }
   const conteo = (valor,dec=0,pre="") => estado.datos ? ` data-count="${Number(valor)}" data-dec="${dec}" data-pre="${pre}"` : "";
@@ -72,23 +73,22 @@
     const ahorro = registros('cuentas',false).filter(c => catalogo('tiposCuenta',c.tipoCuentaId).toUpperCase() === 'AHORRO').reduce((s,c) => s + centavos(saldo(c.id)),0n);
     const cartera = prestamos.reduce((s,p) => s + centavos(p.monto),0n);
     const calidad = registros('albaranes',false).flatMap(a => a.detalles).reduce((s,d) => ({aceptado:s.aceptado+Number(d.cantidadAceptada),total:s.total+Number(d.cantidadAceptada)+Number(d.cantidadRechazada)}),{aceptado:0,total:0});
-    // Cifras ilustrativas exclusivas de la presentación. No crean registros,
-    // saldos ni préstamos en los módulos administrativos o en Oracle.
-    const resumen = conectado ? {
+    // Todas las cifras provienen de los registros consultados a la base de datos.
+    const resumen = {
       socios, prestamos:prestamos.length, capital:Number(cartera)/100,
       aprobado:calidad.total ? calidad.aceptado/calidad.total*100 : null,
       ahorro:Number(ahorro)/100, produccion:calidad.total
-    } : {socios:1284,prestamos:412,capital:8452300,aprobado:91.4,ahorro:12907640,produccion:38420};
+    };
     const atributos = (valor,dec=0,pre='') => valor == null ? '' : ` data-count="${valor}" data-dec="${dec}" data-pre="${pre}"`;
     const fechaPanel = new Intl.DateTimeFormat('es-GT',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'America/Guatemala'}).format(new Date());
-    const sedePanel = estado.sede ? sede(Number(estado.sede)) : conectado ? 'Todas las sedes' : 'Sede Central';
-    const nota = conectado ? 'Datos del sistema · selección actual de sede' : 'Cifras de demostración · presentación del diseño';
-    const formatoAhorro = conectado ? moneda(resumen.ahorro) : 'Q 12.9M';
+    const sedePanel = conectado ? (estado.sede ? sede(Number(estado.sede)) : 'Todas las sedes') : 'Conectando con el sistema…';
+    const nota = conectado ? 'Datos del sistema · selección actual de sede' : 'Conectando con la base de datos del sistema';
+    const formatoAhorro = moneda(resumen.ahorro);
     const etapas = [
       ['Socios',numero(resumen.socios),'agricultora.jpg','Agricultora en su comunidad','Nuestra fuerza comienza en las personas. Cada socio aporta una historia, una cosecha y un futuro compartido.'],
-      [conectado?'Préstamos activos':'Préstamos',numero(resumen.prestamos),'cultivo.jpg','Agricultor trabajando entre cultivos','El impulso para dar el siguiente paso. Recursos que acompañan el trabajo, desde la primera semilla.'],
+      ['Préstamos activos',numero(resumen.prestamos),'cultivo.jpg','Agricultor trabajando entre cultivos','El impulso para dar el siguiente paso. Recursos que acompañan el trabajo, desde la primera semilla.'],
       ['Ahorro',formatoAhorro,'familia-agricultora.jpg','Madre agricultora y su hija','Lo que cultivamos hoy también cuida el mañana. El ahorro une el esfuerzo de las familias con nuevas posibilidades.'],
-      [conectado?'Producción recibida':'Producción',`${numero(resumen.produccion)} kg`,'centro-acopio.jpg','Sacos agrícolas en un centro de acopio','La cosecha encuentra su lugar. Recepción y calidad para reconocer el valor de lo que llega del campo.']
+      ['Producción recibida',`${numero(resumen.produccion)} kg`,'centro-acopio.jpg','Sacos agrícolas en un centro de acopio','La cosecha encuentra su lugar. Recepción y calidad para reconocer el valor de lo que llega del campo.']
     ];
     const modulos = [
       ['personas','01','Las personas, primero.','Socios y empleados, en un mismo lugar.'],
@@ -104,23 +104,22 @@
     return `<div class="editorial-panel">
       <section class="editorial-hero" id="panel-portada" aria-labelledby="saludo-panel">
         <div class="editorial-hero-media"><img class="editorial-hero-photo" src="assets/images/cafetal.jpg" width="2000" height="1333" alt="Cafetal entre colinas verdes" data-parallax="16" data-hero-photo fetchpriority="high"></div>
-        <div class="editorial-hero-copy"><p class="editorial-date">${escapar(fechaPanel)} · ${escapar(sedePanel)}</p><h1 id="saludo-panel">Buenos días, Ana.</h1><p class="editorial-lead">La cooperativa está creciendo.</p><p class="editorial-caption">Un mismo origen.<br>Muchas formas de crecer.</p></div>
+        <div class="editorial-hero-copy"><p class="editorial-date">${escapar(fechaPanel)} · ${escapar(sedePanel)}</p><h1 id="saludo-panel">Buenos días.</h1><p class="editorial-lead">La cooperativa está creciendo.</p><p class="editorial-caption">Un mismo origen.<br>Muchas formas de crecer.</p></div>
         <a class="editorial-scroll" href="#panel-metricas"><span>DESCUBRE TU COOPERATIVA</span><span aria-hidden="true">↓</span></a>
-        <span class="editorial-demo">Ana · nombre de demostración / fotografías de referencia</span>
       </section>
       <section class="editorial-metrics" id="panel-metricas" aria-labelledby="titulo-metricas">
         <header class="editorial-section-heading"><div><p class="eyebrow">EL VALOR DE ESTAR JUNTOS</p><h2 id="titulo-metricas">El esfuerzo se convierte<br>en oportunidades.</h2><p class="editorial-data-note">${nota}</p></div><figure class="editorial-metric-photo" data-clip><img src="assets/images/aguacate-hass.jpg" width="1200" height="800" alt="Aguacate Hass entero y partido" data-parallax="6" loading="lazy"><figcaption>De la tierra, a nuestra mesa.</figcaption></figure></header>
         <div class="editorial-metric-grid" data-stagger>
           <article class="editorial-metric"><span class="editorial-metric-label">Socios activos</span><div class="editorial-metric-number"${atributos(resumen.socios)}>${numero(resumen.socios)}</div><p>Personas que construyen un futuro compartido.</p></article>
-          <article class="editorial-metric"><span class="editorial-metric-label">${conectado?'Cartera activa':'Capital prestado'}</span><div class="editorial-metric-number editorial-metric-number--money"${atributos(resumen.capital,conectado?2:0,'Q ')}>${conectado?moneda(resumen.capital):'Q 8,452,300'}</div><p>${conectado?'Saldo pendiente de los préstamos activos.':'Un impulso para sembrar nuevas posibilidades.'}</p></article>
-          <article class="editorial-metric"><span class="editorial-metric-label">${conectado?'Producto aceptado':'Producto agrícola aprobado'}</span><div class="editorial-metric-number"${atributos(resumen.aprobado,conectado?2:1)}>${resumen.aprobado==null?'—':`${numero(resumen.aprobado)}<small>%</small>`}</div><p>${conectado?'Proporción de los kilogramos recibidos en albaranes.':'La calidad también nace del cuidado.'}</p><div class="editorial-bar-track"><span data-bar="${resumen.aprobado ?? 0}" style="width:${resumen.aprobado ?? 0}%"></span></div></article>
-          <article class="editorial-metric"><span class="editorial-metric-label">${conectado?'Ahorro registrado':'Ahorro administrado'}</span><div class="editorial-metric-number editorial-metric-number--money"${atributos(resumen.ahorro,conectado?2:0,'Q ')}>${conectado?moneda(resumen.ahorro):'Q 12,907,640'}</div><p>El esfuerzo de hoy cuida el mañana.</p></article>
+          <article class="editorial-metric"><span class="editorial-metric-label">Cartera activa</span><div class="editorial-metric-number editorial-metric-number--money"${atributos(resumen.capital,2,'Q ')}>${moneda(resumen.capital)}</div><p>Saldo pendiente de los préstamos activos.</p></article>
+          <article class="editorial-metric"><span class="editorial-metric-label">Producto aceptado</span><div class="editorial-metric-number"${atributos(resumen.aprobado,2)}>${resumen.aprobado==null?'—':`${numero(resumen.aprobado)}<small>%</small>`}</div><p>Proporción de los kilogramos recibidos en albaranes.</p><div class="editorial-bar-track"><span data-bar="${resumen.aprobado ?? 0}" style="width:${resumen.aprobado ?? 0}%"></span></div></article>
+          <article class="editorial-metric"><span class="editorial-metric-label">Ahorro registrado</span><div class="editorial-metric-number editorial-metric-number--money"${atributos(resumen.ahorro,2,'Q ')}>${moneda(resumen.ahorro)}</div><p>El esfuerzo de hoy cuida el mañana.</p></article>
         </div>
         <svg class="editorial-growth-line" viewBox="0 0 1200 180" aria-hidden="true"><path data-draw d="M0 150C130 155 130 95 260 107S435 180 550 92 770 140 860 70 1090 80 1200 15"/></svg>
       </section>
       <section class="editorial-story" id="panel-historias" aria-label="Cuatro formas de crecer" data-parallax-scene>
         <div class="editorial-story-visual"><div class="editorial-story-photo-frame" data-clip>${etapas.map(([titulo,valor,imagen,alt],i)=>`<img class="editorial-story-photo" src="assets/images/${imagen}" width="${i===0?1800:i===2?1000:1200}" height="${i===0?1200:i===2?664:800}" alt="${alt}" data-story-photo="${i}" data-parallax="8">`).join('')}</div><div class="editorial-story-caption"><span data-story-caption>01 / Socios</span><p>LA TIERRA NOS CONECTA</p></div><div class="editorial-story-indicators" aria-hidden="true">${etapas.map((_,i)=>`<span data-story-marker="${i}" class="${i?'':'is-active'}"></span>`).join('')}</div></div>
-        <div class="editorial-story-steps">${etapas.map(([titulo,valor,imagen,alt,descripcion],i)=>`<article class="editorial-story-step" data-story-step="${i}"><span class="editorial-step-index">${String(i+1).padStart(2,'0')} / CULTIVAMOS EN COMUNIDAD</span><h2>${titulo}</h2><strong class="${i===2?'editorial-story-money':''}">${valor}</strong><p>${descripcion}</p><span class="editorial-step-note">${conectado?'Datos del sistema':'Cifra de demostración'}</span></article>`).join('')}</div>
+        <div class="editorial-story-steps">${etapas.map(([titulo,valor,imagen,alt,descripcion],i)=>`<article class="editorial-story-step" data-story-step="${i}"><span class="editorial-step-index">${String(i+1).padStart(2,'0')} / CULTIVAMOS EN COMUNIDAD</span><h2>${titulo}</h2><strong class="${i===2?'editorial-story-money':''}">${valor}</strong><p>${descripcion}</p><span class="editorial-step-note">Datos del sistema</span></article>`).join('')}</div>
       </section>
       <div class="editorial-panel-tail"><p class="editorial-photo-credits"><a href="assets/images/ORIGEN.txt" target="_blank" rel="noopener">Fotografías de referencia · autores y licencias ↗</a></p><div id="panel-aviso"></div><section><div class="section-heading"><div><p class="eyebrow">PRÉSTAMOS Y ENTREGAS</p><h2>Últimos registros.</h2></div><span class="muted">${documentos.length} registros</span></div>${tabla(['Fecha','Documento','Persona','Sede','Monto',''],documentos.map(d=>`<tr><td>${fecha(d.fecha)}</td><td><strong>${escapar(d.ref)}</strong><small>${d.tipo}</small></td><td>${escapar(persona(d.personaId))}</td><td>${escapar(sede(d.sedeId))}</td><td class="amount">${d.valor}</td><td>${botonVer(d.modulo,d.id)}</td></tr>`))}</section><section><div class="section-heading"><div><p class="eyebrow">EL DÍA A DÍA</p><h2>Cada parte, en su lugar.</h2></div></div><div class="module-grid">${modulos.map(([id,n,t,d])=>`<button class="module-card" data-vista="${id}"><span class="module-number">${n} / ${nombres[id]}</span><h3>${t}</h3><p>${d}</p><span class="module-arrow" aria-hidden="true">↗</span></button>`).join('')}</div></section></div>
     </div>`;
@@ -154,16 +153,12 @@
   const vistas = {panel,personas,cuentas,prestamos,productos,albaranes};
   let versionCarga = 0;
   function actualizarAviso(mensaje) {
-    const online=estado.modo==='conectado', demo=estado.modo==='ejemplo';
+    const online=estado.modo==='conectado';
     const titulo=$('#titulo-conexion');
-    if(titulo) titulo.textContent=estado.cargando?'Conectando…':online?'Sistema conectado':demo?'Vista de diseño':'Sin conexión al sistema';
+    if(titulo) titulo.textContent=estado.cargando?'Conectando…':online?'Sistema conectado':'Sin conexión al sistema';
     const texto=$('#texto-conexion');
-    if(texto) texto.textContent=mensaje || (online?'Datos cargados desde el sistema de la cooperativa.':demo?'Datos de prueba del proyecto. Los cambios están deshabilitados.':'Inicia la API para trabajar con tus datos o explora el diseño con los ejemplos del proyecto.');
-    $('#ver-ejemplo').hidden=online||demo||estado.cargando;
-    $('#vaciar-ejemplo').hidden=!demo;
-    if($('#conectar')){$('#conectar').hidden=online;$('#conectar').disabled=estado.cargando;}
+    if(texto) texto.textContent=mensaje || (online?'Datos cargados desde la base de datos de la cooperativa.':'No se pudo conectar con la base de datos. Revisa que la API esté iniciada en el puerto 8081.');
     $('#recargar').disabled=estado.cargando;
-    $('#aviso-conexion').classList.toggle('con-ejemplo',demo);
     $('#aviso-conexion').classList.toggle('conectado',online);
     const envio=$('#dialogo [type="submit"]');
     if(envio && !estado.guardando) envio.disabled=!online||estado.cargando||Boolean(envio.closest('form').dataset.bloqueado);
@@ -184,8 +179,8 @@
     } catch(error) {
       if(version!==versionCarga)return false;
       estado.cargando=false;
-      if(estado.modo!=='ejemplo')estado.modo='desconectado';
-      actualizarAviso(`${error.message}${estado.datos && estado.modo!=='ejemplo'?' Los datos visibles pertenecen a la última consulta; el guardado está deshabilitado.':''}`);
+      estado.modo='desconectado';
+      actualizarAviso(`${error.message}${estado.datos?' Los datos visibles pertenecen a la última consulta; el guardado está deshabilitado.':''}`);
       renderizar();return false;
     }
   }
@@ -212,25 +207,10 @@
     else window.scrollTo({top:0,behavior:'instant'});
     $('#contenido').focus({preventScroll:true});
   }
-  function ejemplo(cargar) {
-    if (estado.guardando) return;
-    versionCarga++;
-    estado.cargando = false;
-    estado.modo = cargar ? 'ejemplo' : 'desconectado';
-    estado.datos = cargar ? window.DATOS_EJEMPLO : null;
-    estado.sede = ''; estado.busqueda = ''; estado.filtro = 'todos';
-    $('#busqueda-global').value = '';
-    $('#selector-sede').innerHTML = '<option value="">Todas las sedes</option>' + datos().catalogos.sedes.map(s => `<option value="${s.id}">${escapar(legible(s.nombre))}</option>`).join('');
-    $('#ver-ejemplo').hidden = cargar; $('#vaciar-ejemplo').hidden = !cargar;
-    $('#aviso-conexion').classList.toggle('con-ejemplo',cargar);
-    const texto = $('#texto-conexion');
-    if (texto) texto.textContent = cargar ? 'Vista de diseño · Datos de prueba del proyecto. Sin conexión a la base de datos.' : 'Vista local · Conexión al servicio pendiente. Aún no se muestran datos de la base de datos.';
-    actualizarAviso(); renderizar(); anunciar(cargar ? 'Datos de prueba del repositorio cargados. Ningún cambio se guarda.' : 'Vista sin datos.');
-  }
   let temporizador;
   function anunciar(mensaje) {clearTimeout(temporizador); $('#notificacion').textContent=mensaje; $('#notificacion').classList.add('visible'); temporizador=setTimeout(()=>$('#notificacion').classList.remove('visible'),6000);}
   function abrirDialogo(titulo,contenido) {$('#titulo-dialogo').textContent=titulo; $('#cuerpo-dialogo').innerHTML=contenido; $('#dialogo').showModal();document.dispatchEvent(new CustomEvent('tierra:dialogo'));}
-  const avisoFormulario = () => estado.modo === 'conectado' ? '<p class="muted">Los cambios se registrarán en el sistema de la cooperativa.</p>' : '<p class="notice">Vista del formulario. Conecta el sistema para guardar. En esta vista de ejemplo no se envían ni se guardan cambios.</p>';
+  const avisoFormulario = () => estado.modo === 'conectado' ? '<p class="muted">Los cambios se registrarán en la base de datos de la cooperativa.</p>' : '<p class="notice">El sistema aún no está conectado. Espera a que termine la consulta para guardar.</p>';
   function verDetalle(tipo,id) {
     const item = buscar(datos()[tipo],id); if (!item) return;
     let contenido = '';
@@ -242,14 +222,14 @@
       contenido=`<div class="detail-grid">${detalle('Número',item.numero)}${detalle('Saldo actual',moneda(saldo(item.id)))}${detalle('Tipo',legible(catalogo('tiposCuenta',item.tipoCuentaId)))}${detalle('Sede',sede(item.sedeId))}${detalle('Apertura',fecha(item.fechaApertura))}${detalle('Estatus',legible(catalogo('estatus',item.estatusId)))}</div><h3>Personas asociadas</h3>${tabla(['Persona','Relación'],titulares.map(cp=>`<tr><td>${escapar(persona(cp.personaId))}</td><td>${cp.titular?'Titular':'Asociado'}</td></tr>`))}<h3>Historial de saldos</h3><p class="muted">Cada fila muestra el saldo registrado en esa fecha.</p>${tabla(['Fecha','Saldo registrado'],historial.map(s=>`<tr><td>${fecha(s.fecha)}</td><td class="amount">${moneda(s.monto)}</td></tr>`))}<div class="action-row"><button class="btn btn-primary" data-operacion="deposito" data-id="${item.id}">Depositar</button><button class="btn btn-secondary" data-operacion="retiro" data-id="${item.id}">Retirar</button><button class="btn btn-text" data-operacion="asociar" data-id="${item.id}">Asociar persona</button></div>`;
     }
     if (tipo === 'prestamos') contenido=`<div class="detail-grid">${detalle('Persona',persona(item.personaId))}${detalle('Tipo',legible(catalogo('tiposPrestamo',item.tipoPrestamoId)))}${detalle('Saldo pendiente',moneda(item.monto))}${detalle('Tasa de interés',numero(item.tasaInteres)+'%')}${detalle('Fecha',fecha(item.fecha))}${detalle('Vencimiento',fecha(item.fechaVencimiento))}${detalle('Estatus',legible(catalogo('estatus',item.estatusId)))}</div>${item.detalles?.length?`<h3>Productos entregados</h3>${tabla(['Producto','Unidades','Precio histórico','Subtotal'],item.detalles.map(d=>`<tr><td>${escapar(producto(d.productoId))}</td><td>${numero(d.cantidad)}</td><td>${moneda(d.precioUnitario)}</td><td class="amount">${monedaCentavos(BigInt(d.cantidad)*centavos(d.precioUnitario))}</td></tr>`))}`:''}<div class="action-row"><button class="btn btn-primary" data-operacion="abono" data-id="${item.id}">Registrar abono</button><button class="btn btn-secondary" data-operacion="estatus-prestamo" data-id="${item.id}">Cambiar estatus</button></div>`;
-    if (tipo === 'albaranes') contenido=`<article class="document"><header class="document-header"><div><span class="document-brand">Tierra Fértil</span><p class="eyebrow">COOPERATIVA AGRÍCOLA</p></div><div><span class="eyebrow">ALBARÁN DE ENTREGA</span><h3>${escapar(item.numeroTalonario)}</h3><p>${fecha(item.fecha)}</p></div></header><div class="detail-grid">${detalle('Socio',persona(item.personaId))}${detalle('DNI / Cédula',buscar(datos().personas,item.personaId)?.dni || '—')}${detalle('Sede de recepción',sede(item.sedeId))}${detalle('Estado de liquidación',item.liquidado?'Liquidado':'Pendiente')}</div>${tabla(['Producto','Aceptado (kg)','Rechazado (kg)','Precio / kg','Valor'],item.detalles.map(d=>`<tr><td>${escapar(producto(d.productoId))}</td><td>${numero(d.cantidadAceptada)}</td><td>${numero(d.cantidadRechazada)}</td><td>${moneda(d.precioUnitario)}</td><td class="amount">${monedaCentavos((centavos(d.cantidadAceptada)*centavos(d.precioUnitario)+50n)/100n)}</td></tr>`))}<div class="document-total"><span>Total a pagar por producto aceptado</span><strong>${monedaCentavos(totalAlbaran(item))}</strong></div><p class="document-caption">${estado.modo === 'ejemplo' ? 'VISTA DE DISEÑO · DATOS DE PRUEBA DEL PROYECTO' : 'DETALLE DE LA ENTREGA REGISTRADA'}</p></article><div class="action-row">${item.liquidado ? '<p class="muted">Esta entrega ya fue liquidada.</p>' : `<button class="btn btn-primary" data-operacion="liquidar" data-id="${item.id}">Abonar a cuenta del socio</button>`}</div>`;
+    if (tipo === 'albaranes') contenido=`<article class="document"><header class="document-header"><div><span class="document-brand">Tierra Fértil</span><p class="eyebrow">COOPERATIVA AGRÍCOLA</p></div><div><span class="eyebrow">ALBARÁN DE ENTREGA</span><h3>${escapar(item.numeroTalonario)}</h3><p>${fecha(item.fecha)}</p></div></header><div class="detail-grid">${detalle('Socio',persona(item.personaId))}${detalle('DNI / Cédula',buscar(datos().personas,item.personaId)?.dni || '—')}${detalle('Sede de recepción',sede(item.sedeId))}${detalle('Estado de liquidación',item.liquidado?'Liquidado':'Pendiente')}</div>${tabla(['Producto','Aceptado (kg)','Rechazado (kg)','Precio / kg','Valor'],item.detalles.map(d=>`<tr><td>${escapar(producto(d.productoId))}</td><td>${numero(d.cantidadAceptada)}</td><td>${numero(d.cantidadRechazada)}</td><td>${moneda(d.precioUnitario)}</td><td class="amount">${monedaCentavos((centavos(d.cantidadAceptada)*centavos(d.precioUnitario)+50n)/100n)}</td></tr>`))}<div class="document-total"><span>Total a pagar por producto aceptado</span><strong>${monedaCentavos(totalAlbaran(item))}</strong></div><p class="document-caption">DETALLE DE LA ENTREGA REGISTRADA</p></article><div class="action-row">${item.liquidado ? '<p class="muted">Esta entrega ya fue liquidada.</p>' : `<button class="btn btn-primary" data-operacion="liquidar" data-id="${item.id}">Abonar a cuenta del socio</button>`}</div>`;
     abrirDialogo(tipo==='albaranes'?'Detalle de la entrega':`Detalle · ${nombres[tipo]}`,contenido);
   }
   function campo(nombre,etiqueta,tipo='text',atributos='',valor='') {return `<label class="field"><span>${etiqueta}</span><input name="${nombre}" type="${tipo}" ${atributos} value="${escapar(valor)}"></label>`;}
   function selector(nombre,etiqueta,opciones,seleccion='',requerido=true) {return `<label class="field"><span>${etiqueta}</span><select name="${nombre}" ${requerido?'required':''}><option value="">Seleccionar…</option>${opciones.map(o=>`<option value="${o.id}" ${String(o.id)===String(seleccion)?'selected':''}>${escapar(o.nombre)}</option>`).join('')}</select></label>`;}
   const opcionesPersonas = (soloSocios=false) => datos().personas.filter(p=>activo(p)&&(!soloSocios||esSocio(p))).map(p=>({id:p.id,nombre:p.nombre+' '+p.apellido}));
   const opcionesCatalogo = tipo => datos().catalogos[tipo].map(c=>({id:c.id,nombre:legible(c.nombre)}));
-  const accionesFormulario = () => `<p id="error-formulario" class="field-error" role="alert"></p><div class="form-actions"><button class="btn btn-secondary" type="button" data-cerrar>Cancelar</button><button class="btn btn-primary" type="submit" ${estado.modo==='conectado' && !estado.cargando ? '' : 'disabled'}>${estado.modo==='conectado'?'Guardar':'Guardar · vista de ejemplo'}</button></div>`;
+  const accionesFormulario = () => `<p id="error-formulario" class="field-error" role="alert"></p><div class="form-actions"><button class="btn btn-secondary" type="button" data-cerrar>Cancelar</button><button class="btn btn-primary" type="submit" ${estado.modo==='conectado' && !estado.cargando ? '' : 'disabled'}>Guardar</button></div>`;
   function formulario(tipo,id) {
     const item = buscar(datos()[tipo],id) || {};
     let campos='';
@@ -350,7 +330,6 @@
     if (b.dataset.vista) navegar(b.dataset.vista);
     if (b.dataset.filtro) {estado.filtro=b.dataset.filtro;renderizar({animar:false});}
     if (b.hasAttribute('data-limpiar')) {estado.filtro='todos';estado.busqueda='';estado.sede='';$('#busqueda-global').value='';$('#selector-sede').value='';renderizar({animar:false});}
-    if (b.hasAttribute('data-ejemplo')) ejemplo(true);
     if (b.dataset.detalle) verDetalle(b.dataset.detalle,b.dataset.id);
     if (b.dataset.nuevo) formulario(b.dataset.nuevo);
     if (b.dataset.editar) formulario(b.dataset.editar,b.dataset.id);
@@ -366,10 +345,7 @@
   document.addEventListener('input',evento=>{if(evento.target.closest('#lineas-formulario')) actualizarTotal();});
   $('#busqueda-global').addEventListener('input',evento=>{estado.busqueda=evento.target.value;renderizar({animar:false});});
   $('#selector-sede').addEventListener('change',evento=>{estado.sede=evento.target.value;renderizar({animar:false});});
-  $('#ver-ejemplo').addEventListener('click',()=>ejemplo(true));
-  $('#vaciar-ejemplo').addEventListener('click',()=>ejemplo(false));
-  $('#recargar').addEventListener('click',()=>{if(estado.modo==='ejemplo'){renderizar();anunciar('Vista actualizada con los datos de prueba del proyecto.');}else conectar();});
-  $('#conectar')?.addEventListener('click',()=>conectar());
+  $('#recargar').addEventListener('click',()=>conectar());
   $('#cerrar-dialogo').addEventListener('click',()=>{if(!estado.guardando)$('#dialogo').close();});
   $('#dialogo').addEventListener('cancel',evento=>{if(estado.guardando)evento.preventDefault();});
   $('#dialogo').addEventListener('click',evento=>{if(!estado.guardando && evento.target===$('#dialogo')){const r=evento.target.getBoundingClientRect();if(evento.clientX<r.left||evento.clientX>r.right||evento.clientY<r.top||evento.clientY>r.bottom) evento.target.close();}});
@@ -379,5 +355,5 @@
   $('#fecha-actual').textContent=new Intl.DateTimeFormat('es-GT',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'America/Guatemala'}).format(new Date());
   $('#selector-sede').innerHTML='<option value="">Todas las sedes</option>';
   actualizarAviso();
-  if (location.protocol !== 'file:' && location.port === '8081') conectar();
+  conectar();
 })();

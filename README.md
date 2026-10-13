@@ -91,7 +91,9 @@ una sola transacción, impidiendo volver a liquidarlo.
 siguiendo [`scripts/LEEME_FIX_PAGOS.md`](scripts/LEEME_FIX_PAGOS.md). Para una base nueva,
 `scripts/01_schema_oracle.sql` ya contiene la estructura corregida. Si existen
 entregas antiguas con pagos, conciliar su estado antes de migrar; no volver a cargar
-los datos de ejemplo sobre una base existente.
+los datos de ejemplo sobre una base existente. La receta paso a paso de ejecución
+(instalación nueva vs. migración) está en
+[`scripts/README.md`](scripts/README.md).
 
 Las pruebas de negocio están en `src/test/java/com/cooperativa/FinancialOperationsIntegration.java`.
 Son una clase `main` de integración con Oracle, sin dependencias nuevas; no se
