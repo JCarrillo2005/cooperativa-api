@@ -177,6 +177,13 @@ cargar el esquema `09`–`12` y ejecutar respaldo/recuperación— están en
   el saldo: un préstamo solo pasa a `PAGADO` cuando el monto llega a `0.00` (registra el abono) y
   uno ya pagado no puede volver a otro estatus. Así la cartera activa no puede ocultar deuda.
 
+**Modelo de préstamos.** El `monto` de un préstamo es la **deuda a pagar (saldo pendiente)**: los
+abonos la reducen y al llegar a `0.00` el préstamo pasa a `PAGADO`. La `tasaInteres` se registra y
+se muestra como **referencia**: el sistema no la suma automáticamente a la deuda (si la cooperativa
+quiere cobrarla, registra el préstamo por el total pactado). Los préstamos **no mueven el saldo de
+las cuentas**: son un libro aparte. Solo los depósitos, los retiros y la liquidación de albaranes
+acreditan o debitan una cuenta.
+
 ### Albaranes (Entregas de Cosecha)
 
 - GET /api/albaranes — Lista todas las entregas de los socios.
