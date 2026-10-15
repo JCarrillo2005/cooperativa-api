@@ -128,13 +128,29 @@ public class PrestamoController {
 
     // ---------- Estatus ----------
 
-    /** Por ejemplo: cambiarEstatus(5, "PAGADO"). El estatus debe existir en el catálogo. */
+    /**
+     * Por ejemplo: cambiarEstatus(5, "PAGADO"). El estatus debe existir en el catálogo.
+     * Mantiene la coherencia con el saldo: PAGADO solo cuando el monto es cero, y un
+     * préstamo ya pagado no puede volver a otro estatus. Los abonos aplican esta misma
+     * regla automáticamente, así que la cartera activa nunca esconde deuda pendiente.
+     */
     public void cambiarEstatus(int prestamoId, String nombreEstatus) throws NegocioException {
         try {
-            if (prestamoDAO.obtenerPorId(prestamoId) == null) {
+            Prestamo p = prestamoDAO.obtenerPorId(prestamoId);
+            if (p == null) {
                 throw new NegocioException("El préstamo no existe.");
             }
-            prestamoDAO.cambiarEstatus(prestamoId, Catalogos.estatusId(nombreEstatus));
+            int nuevoEstatus = Catalogos.estatusId(nombreEstatus);
+            boolean esPagado = Catalogos.ESTATUS_PAGADO.equalsIgnoreCase(nombreEstatus);
+            if (esPagado && p.getMonto().signum() > 0) {
+                throw new NegocioException("El préstamo tiene un saldo pendiente de Q"
+                    + p.getMonto().setScale(2, RoundingMode.HALF_UP)
+                    + "; registra el abono hasta dejarlo en Q0.00 para marcarlo como PAGADO.");
+            }
+            if (!esPagado && p.getMonto().signum() == 0) {
+                throw new NegocioException("El préstamo ya está pagado (saldo Q0.00): su estatus debe ser PAGADO.");
+            }
+            prestamoDAO.cambiarEstatus(prestamoId, nuevoEstatus);
         } catch (SQLException e) {
             throw NegocioException.deSQL("No se pudo cambiar el estatus del préstamo", e);
         }
@@ -155,7 +171,7 @@ public class PrestamoController {
             throw new NegocioException("El monto del abono debe ser mayor que cero.");
         }
         try {
-            int estatusPagado = Catalogos.estatusId("PAGADO");
+            int estatusPagado = Catalogos.estatusId(Catalogos.ESTATUS_PAGADO);
             try (Connection conn = ConexionOracle.getConexion()) {
                 conn.setAutoCommit(false);
                 try {
@@ -169,7 +185,8 @@ public class PrestamoController {
                     }
                     if (montoAbono.compareTo(p.getMonto()) > 0) {
                         throw new NegocioException("El abono (Q" + montoAbono
-                            + ") no puede superar el saldo pendiente actual (Q" + p.getMonto() + ").");
+                            + ") no puede superar el saldo pendiente actual (Q"
+                            + p.getMonto().setScale(2, RoundingMode.HALF_UP) + ").");
                     }
                     BigDecimal nuevoSaldo = p.getMonto().subtract(montoAbono).setScale(2, RoundingMode.HALF_UP);
                     p.setMonto(nuevoSaldo);

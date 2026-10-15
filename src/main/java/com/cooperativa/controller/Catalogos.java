@@ -13,6 +13,7 @@ public class Catalogos {
 
     public static final String ESTATUS_ACTIVO = "ACTIVO";
     public static final String ESTATUS_INACTIVO = "INACTIVO";
+    public static final String ESTATUS_PAGADO = "PAGADO";
     public static final String TIPO_PERSONA_SOCIO = "SOCIO";
     public static final String TIPO_PRESTAMO_CONSUMO = "CONSUMO_PRODUCTOS";
 

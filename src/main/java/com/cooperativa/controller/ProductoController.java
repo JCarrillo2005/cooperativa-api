@@ -24,6 +24,11 @@ public class ProductoController {
         }
         try {
             validar(p);
+            // Las existencias solo se fijan al dar de alta el producto; despues
+            // se mueven por descuento (consumo) o ingreso de mercancia.
+            if (p.getStock() < 0) {
+                throw new NegocioException("El stock no puede ser negativo.");
+            }
             productoDAO.guardar(p);
             return p;
         } catch (SQLException e) {
@@ -31,6 +36,7 @@ public class ProductoController {
         }
     }
 
+    /** Actualiza nombre, categoria y precio. La edicion no toca las existencias. */
     public Producto actualizar(Producto p) throws NegocioException {
         if (p == null) {
             throw new NegocioException("No se recibieron los datos del producto.");
@@ -147,8 +153,5 @@ public class ProductoController {
             throw new NegocioException("El precio debe ser mayor que cero.");
         }
         p.setPrecio(p.getPrecio().setScale(2, RoundingMode.HALF_UP));
-        if (p.getStock() < 0) {
-            throw new NegocioException("El stock no puede ser negativo.");
-        }
     }
 }

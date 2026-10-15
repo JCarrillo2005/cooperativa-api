@@ -151,7 +151,8 @@ public class CuentaController {
                     BigDecimal nuevo = esRetiro ? base.subtract(monto) : base.add(monto);
 
                     if (nuevo.signum() < 0) {
-                        throw new NegocioException("Saldo insuficiente. Saldo actual: " + base + ".");
+                        throw new NegocioException("Saldo insuficiente. Saldo actual: "
+                            + base.setScale(2, RoundingMode.HALF_UP) + ".");
                     }
                     saldoDAO.registrar(new Saldo(0, cuentaId, nuevo, null), conn);
                     conn.commit();
@@ -206,42 +207,70 @@ public class CuentaController {
 
     // ---------- Personas de la cuenta ----------
 
+    /**
+     * Agrega una persona a una cuenta existente. Bloquea la cuenta para que la
+     * verificación de duplicados y el INSERT sean una sola operación atómica.
+     */
     public void agregarPersona(int cuentaId, int personaId, boolean titular) throws NegocioException {
         personaController.obtenerActiva(personaId);
-        try {
-            if (cuentaDAO.obtenerPorId(cuentaId) == null) {
-                throw new NegocioException("La cuenta no existe.");
-            }
-            for (CuentaPersona cp : cuentaPersonaDAO.obtenerPorCuenta(cuentaId)) {
-                if (cp.getPersonaId() == personaId) {
-                    throw new NegocioException("La persona ya pertenece a esta cuenta.");
+        try (Connection conn = ConexionOracle.getConexion()) {
+            conn.setAutoCommit(false);
+            try {
+                cuentaDAO.bloquear(cuentaId, conn);
+                if (cuentaDAO.obtenerPorId(cuentaId, conn) == null) {
+                    throw new NegocioException("La cuenta no existe.");
                 }
+                for (CuentaPersona cp : cuentaPersonaDAO.obtenerPorCuenta(cuentaId, conn)) {
+                    if (cp.getPersonaId() == personaId) {
+                        throw new NegocioException("La persona ya pertenece a esta cuenta.");
+                    }
+                }
+                cuentaPersonaDAO.agregar(new CuentaPersona(cuentaId, personaId, titular), conn);
+                conn.commit();
+            } catch (SQLException | RuntimeException | NegocioException e) {
+                conn.rollback();
+                throw e;
             }
-            cuentaPersonaDAO.agregar(new CuentaPersona(cuentaId, personaId, titular));
         } catch (SQLException e) {
             throw NegocioException.deSQL("No se pudo agregar la persona a la cuenta", e);
         }
     }
 
-    /** No permite dejar la cuenta sin titular. */
+    /**
+     * No permite dejar la cuenta sin titular. Bloquea la cuenta antes de contar los
+     * titulares: dos bajas simultáneas no pueden eliminar a los dos últimos.
+     */
     public void quitarPersona(int cuentaId, int personaId) throws NegocioException {
-        try {
-            CuentaPersona objetivo = null;
-            boolean quedaTitular = false;
-            for (CuentaPersona cp : cuentaPersonaDAO.obtenerPorCuenta(cuentaId)) {
-                if (cp.getPersonaId() == personaId) {
-                    objetivo = cp;
-                } else if (cp.isTitular()) {
-                    quedaTitular = true;
+        try (Connection conn = ConexionOracle.getConexion()) {
+            conn.setAutoCommit(false);
+            try {
+                cuentaDAO.bloquear(cuentaId, conn);
+                if (cuentaDAO.obtenerPorId(cuentaId, conn) == null) {
+                    throw new NegocioException("La cuenta no existe.");
                 }
+                CuentaPersona objetivo = null;
+                boolean quedaTitular = false;
+                for (CuentaPersona cp : cuentaPersonaDAO.obtenerPorCuenta(cuentaId, conn)) {
+                    if (cp.getPersonaId() == personaId) {
+                        objetivo = cp;
+                    } else if (cp.isTitular()) {
+                        quedaTitular = true;
+                    }
+                }
+                if (objetivo == null) {
+                    throw new NegocioException("La persona no pertenece a esta cuenta.");
+                }
+                if (!quedaTitular) {
+                    throw new NegocioException("No se puede quitar: la cuenta debe conservar al menos un titular.");
+                }
+                if (!cuentaPersonaDAO.quitar(cuentaId, personaId, conn)) {
+                    throw new NegocioException("La persona no pertenece a esta cuenta.");
+                }
+                conn.commit();
+            } catch (SQLException | RuntimeException | NegocioException e) {
+                conn.rollback();
+                throw e;
             }
-            if (objetivo == null) {
-                throw new NegocioException("La persona no pertenece a esta cuenta.");
-            }
-            if (!quedaTitular) {
-                throw new NegocioException("No se puede quitar: la cuenta debe conservar al menos un titular.");
-            }
-            cuentaPersonaDAO.quitar(cuentaId, personaId);
         } catch (SQLException e) {
             throw NegocioException.deSQL("No se pudo quitar la persona de la cuenta", e);
         }

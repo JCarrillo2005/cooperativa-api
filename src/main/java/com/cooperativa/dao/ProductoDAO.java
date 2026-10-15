@@ -89,17 +89,21 @@ public class ProductoDAO {
 
     // ---------- UPDATE ----------
 
+    /**
+     * Actualiza solo los datos descriptivos y el precio. Las existencias no se
+     * sobrescriben: cambian unicamente con movimientos (descontarStock/aumentarStock),
+     * de modo que editar un producto no revierta ventas o ingresos de mercancia.
+     */
     public boolean actualizar(Producto p) throws SQLException {
         String sql = "UPDATE productos SET nombre = ?, descripcion = ?, categoria_id = ?, "
-                   + "precio = ?, stock = ? WHERE id = ?";
+                   + "precio = ? WHERE id = ?";
         try (Connection conn = ConexionOracle.getConexion();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, p.getNombre());
             ps.setString(2, p.getDescripcion());
             ps.setInt(3, p.getCategoriaId());
             ps.setBigDecimal(4, p.getPrecio());
-            ps.setInt(5, p.getStock());
-            ps.setInt(6, p.getId());
+            ps.setInt(5, p.getId());
             return ps.executeUpdate() == 1;
         }
     }

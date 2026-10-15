@@ -40,11 +40,17 @@ public class CuentaPersonaDAO {
     }
 
     public List<CuentaPersona> obtenerPorCuenta(int cuentaId) throws SQLException {
+        try (Connection conn = ConexionOracle.getConexion()) {
+            return obtenerPorCuenta(cuentaId, conn);
+        }
+    }
+
+    /** Para usar dentro de una transacción externa que ya bloqueó la cuenta. */
+    public List<CuentaPersona> obtenerPorCuenta(int cuentaId, Connection conn) throws SQLException {
         List<CuentaPersona> lista = new ArrayList<CuentaPersona>();
         String sql = "SELECT cuenta_id, persona_id, titular FROM cuentas_personas "
                    + "WHERE cuenta_id = ? ORDER BY titular DESC, persona_id";
-        try (Connection conn = ConexionOracle.getConexion();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, cuentaId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -96,17 +102,11 @@ public class CuentaPersonaDAO {
     }
 
     public boolean quitar(int cuentaId, int personaId) throws SQLException {
-        String sql = "DELETE FROM cuentas_personas WHERE cuenta_id = ? AND persona_id = ?";
         try (Connection conn = ConexionOracle.getConexion()) {
             boolean autoCommitOriginal = conn.getAutoCommit();
             try {
                 conn.setAutoCommit(false);
-                boolean eliminado;
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setInt(1, cuentaId);
-                    ps.setInt(2, personaId);
-                    eliminado = ps.executeUpdate() == 1;
-                }
+                boolean eliminado = quitar(cuentaId, personaId, conn);
                 conn.commit();
                 return eliminado;
             } catch (SQLException e) {
@@ -115,6 +115,16 @@ public class CuentaPersonaDAO {
             } finally {
                 conn.setAutoCommit(autoCommitOriginal);
             }
+        }
+    }
+
+    /** Para usar dentro de una transacción externa que ya bloqueó la cuenta. */
+    public boolean quitar(int cuentaId, int personaId, Connection conn) throws SQLException {
+        String sql = "DELETE FROM cuentas_personas WHERE cuenta_id = ? AND persona_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, cuentaId);
+            ps.setInt(2, personaId);
+            return ps.executeUpdate() == 1;
         }
     }
 

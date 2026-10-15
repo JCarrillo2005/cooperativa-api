@@ -158,7 +158,12 @@ cargar el esquema `09`–`12` y ejecutar respaldo/recuperación— están en
 
 - GET /api/productos/stock-bajo?umbral=5 — Muestra productos con stock crítico.
 
-- POST /api/productos — Da de alta un nuevo producto.
+- PUT /api/productos/{id} — Actualiza nombre, categoría y precio. **No modifica las
+  existencias**: el inventario solo cambia con los movimientos de abajo.
+
+- PATCH /api/productos/{id}/stock?cantidad=10 — Entrada de mercancía (suma existencias).
+
+- POST /api/productos — Da de alta un nuevo producto (aquí sí se fijan las existencias iniciales).
 
 ### Préstamos
 
@@ -167,6 +172,10 @@ cargar el esquema `09`–`12` y ejecutar respaldo/recuperación— están en
 - POST /api/prestamos — Registra un préstamo (efectivo o consumo de productos con descuento de stock atómico).
 
 - PATCH /api/prestamos/{id}/abono?montoAbono=200.00 — Registra un abono o liquidación.
+
+- PATCH /api/prestamos/{id}/estatus?estatus=PAGADO — Cambia el estatus cuidando la coherencia con
+  el saldo: un préstamo solo pasa a `PAGADO` cuando el monto llega a `0.00` (registra el abono) y
+  uno ya pagado no puede volver a otro estatus. Así la cartera activa no puede ocultar deuda.
 
 ### Albaranes (Entregas de Cosecha)
 
